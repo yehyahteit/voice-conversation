@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#111; display:flex; align-items:center; justify-content:center; min-height:100vh; flex-direction:column; gap:16px; font-family:sans-serif; color:white; }
+
+.avatar-wrap {
+  position:relative;
+  width:260px; height:298px;
+}
+img {
+  width:260px; height:298px;
+  object-fit:cover;
+  border-radius:50% 50% 45% 45% / 55% 55% 45% 45%;
+  display:block; pointer-events:none;
+  position:absolute; inset:0;
+}
+#mouthCanvas {
+  position:absolute;
+  inset:0;
+  width:260px; height:298px;
+  pointer-events:none;
+  z-index:10;
+}
+
+.controls {
+  display:flex; flex-direction:column; gap:8px; align-items:center;
+  background:rgba(255,255,255,0.05); padding:16px 24px; border-radius:12px;
+  min-width:340px;
+}
+.row { display:flex; align-items:center; gap:10px; width:100%; }
+label { font-size:13px; width:100px; color:#aaa; flex-shrink:0; }
+input[type=range] { flex:1; }
+span.val { font-size:13px; width:32px; text-align:right; color:#fff; }
+.btns { display:flex; gap:10px; margin-top:4px; flex-wrap:wrap; justify-content:center; }
+button { padding:9px 18px; font-size:14px; cursor:pointer; border:none; border-radius:8px; font-weight:600; }
+.btn-test { background:#4f8aff; color:white; }
+.btn-copy { background:#22c55e; color:white; }
+#coords { font-size:12px; color:#4cff91; font-family:monospace; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<div class="avatar-wrap" id="wrap">
+  <img src="avatar.jpg" alt="avatar"/>
+  <canvas id="mouthCanvas" width="260" height="298"></canvas>
+</div>
+
+<div class="controls">
+  <div class="row"><label>Centre X</label><input type="range" id="sl_cx" min="80" max="180" value="130"><span class="val" id="v_cx">130</span></div>
+  <div class="row"><label>Centre Y</label><input type="range" id="sl_cy" min="140" max="240" value="204"><span class="val" id="v_cy">204</span></div>
+  <div class="row"><label>Width</label><input type="range"   id="sl_w"  min="20"  max="80"  value="38"><span class="val" id="v_w">38</span></div>
+  <div class="row"><label>Height</label><input type="range"  id="sl_h"  min="4"   max="24"  value="10"><span class="val" id="v_h">10</span></div>
+  <div class="btns">
+    <button class="btn-test" onclick="startTest()">▶ Test Animation</button>
+    <button class="btn-copy" onclick="copyVals()">📋 Copy Values</button>
+  </div>
+  <div id="coords">cx:130 cy:204 w:38 h:10</div>
+</div>
+
+<script>
+const canvas = document.getElementById('mouthCanvas');
+const ctx    = canvas.getContext('2d');
+
+// Mouth params — updated by sliders
+let MX = 130, MY = 204, MW = 38, MH = 10;
+let openAmt = 0;   // 0=closed, 1=fully open
+let speaking = false;
+let phase = 0;
+
+// Skin/lip colours sampled from photo
+const UPPER_LIP = '#b78c7a';
+const LOWER_LIP = '#a7806d';
+const LIP_LINE  = '#8a5a4a';
+const MOUTH_INT = '#3d1510';
+const TEETH_COL = '#ede8e2';
+const GUMS_COL  = '#c47070';
+
+function drawMouth(open) {
+  ctx.clearRect(0, 0, 260, 298);
+
+  const cx = MX, cy = MY;
+  const rw = MW / 2;       // half-width
+  const rh = MH / 2;       // half-height (closed)
+  const gap = open * MH * 1.8;  // how far lips separate
+
+  // ── Mouth interior (dark cavity) ──
+  if (open > 0.05) {
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rw * 0.88, gap * 0.55 + 1, 0, 0, Math.PI * 2);
+    ctx.fillStyle = MOUTH_INT;
+    ctx.fill();
+
+    // ── Upper teeth ──
+    if (open > 0.15) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(cx, cy - gap * 0.1, rw * 0.72, gap * 0.38, 0, Math.PI, 2 * Math.PI);
+      ctx.clip();
+
+      // individual tooth separators
+      ctx.fillStyle = TEETH_COL;
+      ctx.fillRect(cx - rw * 0.72, cy - gap * 0.48, rw * 1.44, gap * 0.4);
+
+      // tooth dividers
+      ctx.strokeStyle = 'rgba(180,170,160,0.4)';
+      ctx.lineWidth = 0.8;
+      [-0.36, -0.12, 0.12, 0.36].forEach(offset => {
+        ctx.beginPath();
+        ctx.moveTo(cx + offset * rw * 2, cy - gap * 0.48);
+        ctx.lineTo(cx + offset * rw * 2, cy - gap * 0.08);
+        ctx.stroke();
+      });
+
+      // tooth shadow at top
+      const tg = ctx.createLinearGradient(cx, cy - gap * 0.48, cx, cy - gap * 0.1);
+      tg.addColorStop(0, 'rgba(0,0,0,0.25)');
+      tg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = tg;
+      ctx.fillRect(cx - rw * 0.72, cy - gap * 0.48, rw * 1.44, gap * 0.4);
+      ctx.restore();
+    }
+
+    // ── Lower teeth (subtle) ──
+    if (open > 0.3) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + gap * 0.1, rw * 0.6, gap * 0.28, 0, 0, Math.PI);
+      ctx.clip();
+      ctx.fillStyle = '#d8d2cc';
+      ctx.fillRect(cx - rw * 0.6, cy, rw * 1.2, gap * 0.3);
+      ctx.restore();
+    }
+  }
+
+  // ── Upper lip ──
+  ctx.beginPath();
+  // cupid's bow shape
+  ctx.moveTo(cx - rw, cy - open * gap * 0.1);
+  ctx.bezierCurveTo(
+    cx - rw * 0.6, cy - rh - gap * 0.5 - open * 2,
+    cx - rw * 0.15, cy - rh * 0.3 - open * 1,
+    cx, cy - rh * 0.1 - open * gap * 0.08
+  );
+  ctx.bezierCurveTo(
+    cx + rw * 0.15, cy - rh * 0.3 - open * 1,
+    cx + rw * 0.6,  cy - rh - gap * 0.5 - open * 2,
+    cx + rw, cy - open * gap * 0.1
+  );
+  ctx.bezierCurveTo(
+    cx + rw * 0.5, cy - rh * 0.5,
+    cx - rw * 0.5, cy - rh * 0.5,
+    cx - rw, cy - open * gap * 0.1
+  );
+  // upper lip fill
+  const ulGrad = ctx.createLinearGradient(cx, cy - rh - open*3, cx, cy);
+  ulGrad.addColorStop(0, '#c49a86');
+  ulGrad.addColorStop(0.4, UPPER_LIP);
+  ulGrad.addColorStop(1, '#8a5a4a');
+  ctx.fillStyle = ulGrad;
+  ctx.fill();
+
+  // upper lip highlight
+  ctx.beginPath();
+  ctx.ellipse(cx, cy - rh * 0.6 - open, rw * 0.22, rh * 0.28, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,220,200,0.18)';
+  ctx.fill();
+
+  // ── Lower lip ──
+  ctx.beginPath();
+  ctx.moveTo(cx - rw, cy + open * gap * 0.1);
+  ctx.bezierCurveTo(
+    cx - rw * 0.5, cy + rh + gap * 0.6 + open * 3,
+    cx + rw * 0.5, cy + rh + gap * 0.6 + open * 3,
+    cx + rw, cy + open * gap * 0.1
+  );
+  ctx.bezierCurveTo(
+    cx + rw * 0.5, cy + rh * 0.3,
+    cx - rw * 0.5, cy + rh * 0.3,
+    cx - rw, cy + open * gap * 0.1
+  );
+  const llGrad = ctx.createLinearGradient(cx, cy, cx, cy + rh + open*4);
+  llGrad.addColorStop(0, '#8a5a4a');
+  llGrad.addColorStop(0.3, LOWER_LIP);
+  llGrad.addColorStop(0.7, '#c49a86');
+  llGrad.addColorStop(1, '#b08070');
+  ctx.fillStyle = llGrad;
+  ctx.fill();
+
+  // lower lip highlight
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + rh * 0.55 + open * 2, rw * 0.35, rh * 0.32, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,220,200,0.22)';
+  ctx.fill();
+
+  // ── Lip line / corners ──
+  ctx.beginPath();
+  ctx.moveTo(cx - rw, cy);
+  ctx.bezierCurveTo(cx - rw * 0.5, cy + rh * 0.15, cx + rw * 0.5, cy + rh * 0.15, cx + rw, cy);
+  ctx.strokeStyle = LIP_LINE;
+  ctx.lineWidth = open > 0.05 ? 0 : 1.2;
+  ctx.stroke();
+}
+
+// ── Animation loop ──
+let going = false;
+(function loop() {
+  requestAnimationFrame(loop);
+  if (going) {
+    phase += 0.13;
+    const raw = Math.sin(phase) * 0.5 + Math.sin(phase * 2.7 + 0.5) * 0.28 + Math.sin(phase * 1.3 + 1.2) * 0.15 + 0.07;
+    openAmt += (Math.max(0, Math.min(1, raw)) - openAmt) * 0.3;
+  } else {
+    openAmt += (0 - openAmt) * 0.25;
+  }
+  drawMouth(openAmt);
+})();
+
+function startTest() {
+  going = true; phase = 0;
+  setTimeout(() => { going = false; }, 5000);
+}
+
+// ── Sliders ──
+const sliders = {
+  cx: document.getElementById('sl_cx'),
+  cy: document.getElementById('sl_cy'),
+  w:  document.getElementById('sl_w'),
+  h:  document.getElementById('sl_h'),
+};
+function applySliders() {
+  MX = +sliders.cx.value; MY = +sliders.cy.value;
+  MW = +sliders.w.value;  MH = +sliders.h.value;
+  document.getElementById('v_cx').textContent = MX;
+  document.getElementById('v_cy').textContent = MY;
+  document.getElementById('v_w').textContent  = MW;
+  document.getElementById('v_h').textContent  = MH;
+  document.getElementById('coords').textContent = `cx:${MX} cy:${MY} w:${MW} h:${MH}`;
+  drawMouth(openAmt);
+}
+Object.values(sliders).forEach(s => s.addEventListener('input', applySliders));
+applySliders();
+
+function copyVals() {
+  const txt = document.getElementById('coords').textContent;
+  navigator.clipboard.writeText(txt).then(() => alert('Copied: ' + txt));
+}
+</script>
+</body>
+</html>
