@@ -248,7 +248,8 @@ async def avatar():
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
     print("🎙️  Voice Conversation — Avatar UI")
-    print("   Open http://localhost:8000 in your browser")
+    print(f"   Open http://localhost:{port} in your browser")
     print("   Press Ctrl+C to stop\n")
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning")
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
