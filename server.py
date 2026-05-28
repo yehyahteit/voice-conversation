@@ -18,6 +18,7 @@ Audio to browser:   binary WebSocket frame (MP3 bytes)
 import asyncio
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -70,6 +71,54 @@ async def run_in_thread(fn, *args):
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(executor, fn, *args)
 
+# ── WhatsApp intent detection ─────────────────────────────────────────────────
+
+# English trigger patterns: "send a whatsapp [to X] saying Y" / "send whatsapp message Y"
+_WA_EN = re.compile(
+    r"(?:send|write|compose)\s+(?:a\s+)?(?:whatsapp|whats\s*app|watsapp|what'?s\s*app)"
+    r"(?:\s+(?:message|msg|text))?"
+    r"(?:\s+to\s+\w+)?"
+    r"\s+(?:saying|that says?|with\s+(?:the\s+)?(?:message|text)?)?\s+[\"']?(.+)[\"']?",
+    re.IGNORECASE,
+)
+# Fallback: anything after "saying" / "message saying"
+_WA_SAYING = re.compile(
+    r"(?:whatsapp|whats\s*app|watsapp)"
+    r".*?(?:saying|that says?|with message|the message|message saying)\s+[\"']?(.+)[\"']?",
+    re.IGNORECASE,
+)
+# Arabic patterns
+_WA_AR = re.compile(
+    r"(?:ابعت|أرسل|بعت|ارسل)"
+    r".*?(?:واتساب|واتس|وتساب)"
+    r".*?(?:قلو|قلها|قللو|بقول|رسالة|إنو|انو)?\s*(.+)",
+    re.IGNORECASE,
+)
+
+def detect_whatsapp_intent(text: str):
+    """
+    Returns (message_to_send: str) if user wants to send WhatsApp, else None.
+    Matches English and Arabic trigger phrases.
+    """
+    t = text.strip()
+    for pattern in (_WA_EN, _WA_SAYING, _WA_AR):
+        m = pattern.search(t)
+        if m:
+            msg = m.group(1).strip().strip('"\'')
+            if msg:
+                return msg
+    # Broad fallback: contains whatsapp keyword at all
+    if re.search(r"whatsapp|whats\s*app|watsapp|واتساب|واتس", t, re.IGNORECASE):
+        # Try to grab text after "saying" / "قلو" / "رسالة"
+        after = re.search(
+            r"(?:saying|that says?|message saying|قلو|قلها|رسالة|إنو|انو)\s+(.+)",
+            t, re.IGNORECASE
+        )
+        if after:
+            return after.group(1).strip().strip('"\'')
+    return None
+
+
 # ── Voice pipeline ────────────────────────────────────────────────────────────
 
 async def handle_audio(ws: WebSocket, conv: Conversation, audio_bytes: bytes):
@@ -102,33 +151,38 @@ async def handle_audio(ws: WebSocket, conv: Conversation, audio_bytes: bytes):
             await send_json(ws, {"state": "idle"})
             return
 
-        # 3. Claude LLM
+        # 3. WhatsApp intent — detected from user's speech directly (no Claude JSON needed)
+        wa_message = detect_whatsapp_intent(user_text)
+        if wa_message:
+            print(f"📱 WhatsApp intent detected. Message: {wa_message!r}")
+            # Detect language for confirmation
+            is_arabic = bool(re.search(r"[؀-ۿ]", user_text))
+            if is_arabic:
+                spoken_reply = "تمام، عم بعت الرسالة هلق!"
+            else:
+                spoken_reply = "Got it, sending your WhatsApp message now!"
+            try:
+                await run_in_thread(send_whatsapp, wa_message)
+            except Exception as wa_err:
+                print(f"❌ WhatsApp send error: {wa_err}")
+                spoken_reply = "Sorry, I couldn't send the WhatsApp message. Please try again."
+            # Also add to conversation history so Claude knows what happened
+            conv.history.append({"role": "user", "content": user_text})
+            conv.history.append({"role": "assistant", "content": spoken_reply})
+            await send_json(ws, {"state": "speaking", "text": spoken_reply})
+            mp3_path = await run_in_thread(speak_to_file, spoken_reply)
+            await send_audio(ws, mp3_path)
+            await send_json(ws, {"state": "idle"})
+            return
+
+        # 4. Claude LLM (normal conversation)
         reply = await run_in_thread(conv.send, user_text)
         reply = reply.strip()
         print(f"🤖 Yehya: {reply!r}")
 
-        # 3b. WhatsApp intent detection — Claude returns JSON when it detects intent
-        spoken_reply = reply
-        try:
-            # Strip markdown code fences if Claude wrapped the JSON
-            clean = reply.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
-            if clean.startswith("{") and '"action"' in clean:
-                action_data = json.loads(clean)
-                if action_data.get("action") == "send_whatsapp":
-                    wa_message = action_data.get("message", "")
-                    spoken_reply = action_data.get("spoken", "Sending your WhatsApp message now!")
-                    print(f"📱 WhatsApp intent detected. Message: {wa_message!r}")
-                    try:
-                        await run_in_thread(send_whatsapp, wa_message)
-                    except Exception as wa_err:
-                        print(f"❌ WhatsApp send error: {wa_err}")
-                        spoken_reply = "Sorry, I couldn't send the WhatsApp message."
-        except (json.JSONDecodeError, AttributeError):
-            pass  # Not JSON — use reply as-is
-
-        # 4. TTS → send audio to browser
-        await send_json(ws, {"state": "speaking", "text": spoken_reply})
-        mp3_path = await run_in_thread(speak_to_file, spoken_reply)
+        # 5. TTS → send audio to browser
+        await send_json(ws, {"state": "speaking", "text": reply})
+        mp3_path = await run_in_thread(speak_to_file, reply)
         await send_audio(ws, mp3_path)
         await send_json(ws, {"state": "idle"})
 
