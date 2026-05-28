@@ -32,6 +32,7 @@ load_dotenv()
 from stt import transcribe
 from llm import Conversation
 from tts import speak_to_file
+from whatsapp import send_whatsapp
 
 # Thread pool for blocking I/O (Whisper + ElevenLabs are sync)
 executor = ThreadPoolExecutor(max_workers=4)
@@ -106,9 +107,28 @@ async def handle_audio(ws: WebSocket, conv: Conversation, audio_bytes: bytes):
         reply = reply.strip()
         print(f"🤖 Yehya: {reply!r}")
 
+        # 3b. WhatsApp intent detection — Claude returns JSON when it detects intent
+        spoken_reply = reply
+        try:
+            # Strip markdown code fences if Claude wrapped the JSON
+            clean = reply.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+            if clean.startswith("{") and '"action"' in clean:
+                action_data = json.loads(clean)
+                if action_data.get("action") == "send_whatsapp":
+                    wa_message = action_data.get("message", "")
+                    spoken_reply = action_data.get("spoken", "Sending your WhatsApp message now!")
+                    print(f"📱 WhatsApp intent detected. Message: {wa_message!r}")
+                    try:
+                        await run_in_thread(send_whatsapp, wa_message)
+                    except Exception as wa_err:
+                        print(f"❌ WhatsApp send error: {wa_err}")
+                        spoken_reply = "Sorry, I couldn't send the WhatsApp message."
+        except (json.JSONDecodeError, AttributeError):
+            pass  # Not JSON — use reply as-is
+
         # 4. TTS → send audio to browser
-        await send_json(ws, {"state": "speaking", "text": reply})
-        mp3_path = await run_in_thread(speak_to_file, reply)
+        await send_json(ws, {"state": "speaking", "text": spoken_reply})
+        mp3_path = await run_in_thread(speak_to_file, spoken_reply)
         await send_audio(ws, mp3_path)
         await send_json(ws, {"state": "idle"})
 

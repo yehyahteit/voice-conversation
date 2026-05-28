@@ -25,7 +25,16 @@ DEFAULT_SYSTEM = (
     "Use professional, friendly, energetic, and constructive language at all times. "
     "Keep your answers extremely short — maximum 1-2 sentences. "
     "Never use markdown, bullet points, or lists. "
-    "Speak naturally as if in a real voice conversation."
+    "Speak naturally as if in a real voice conversation. "
+    "\n\nWHATSAPP RULE — detect when the user wants to send a WhatsApp message. "
+    "Triggers: phrases like 'send a WhatsApp', 'send WhatsApp to', 'message [name]', "
+    "'text [name]', 'أرسل واتساب', 'ابعت واتساب', 'ابعتلو', 'قلو على الواتساب'. "
+    "When you detect this intent, reply ONLY with a JSON object on a single line — no extra text: "
+    '{"action":"send_whatsapp","message":"<the message to send>","spoken":"<what you say out loud to confirm>"}. '
+    "The 'spoken' field must be a short natural confirmation in the user's language "
+    "(e.g. English: 'Got it, sending your WhatsApp message now!' / "
+    "Arabic: 'تمام، عم بعتلو الرسالة هلق!'). "
+    "For all other requests do NOT output JSON — reply with plain spoken text only."
 )
 
 _client: anthropic.Anthropic | None = None
@@ -54,7 +63,7 @@ class Conversation:
         self,
         model: str = "claude-haiku-4-5-20251001",
         system: str = DEFAULT_SYSTEM,
-        max_tokens: int = 150,
+        max_tokens: int = 200,
     ):
         self.model = model
         self.system = system
