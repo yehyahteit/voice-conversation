@@ -25,13 +25,13 @@ from concurrent.futures import ThreadPoolExecutor
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
-from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, Response
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, Response, JSONResponse
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from stt import transcribe
-from llm import Conversation
+from llm import Conversation, generate_suggestions
 from tts import speak_to_file
 from whatsapp import send_whatsapp
 
@@ -72,50 +72,107 @@ async def run_in_thread(fn, *args):
     return await loop.run_in_executor(executor, fn, *args)
 
 # ── WhatsApp intent detection ─────────────────────────────────────────────────
+_WA_KW = r"(?:whatsapp|whats\s*app|watsapp|what'?s\s*app|واتساب|واتس|وتساب)"
 
-# English trigger patterns: "send a whatsapp [to X] saying Y" / "send whatsapp message Y"
-_WA_EN = re.compile(
-    r"(?:send|write|compose)\s+(?:a\s+)?(?:whatsapp|whats\s*app|watsapp|what'?s\s*app)"
+# "WA <NAME> <MESSAGE>"  — shortest form e.g. "whatsapp private hello" (commas optional)
+_WA_SHORT = re.compile(
+    _WA_KW + r"[,\s]+(\w+)[,\s]+(.+)",
+    re.IGNORECASE,
+)
+# "send/message <NAME> <MESSAGE>" — no whatsapp keyword needed (commas optional)
+_WA_MSG_NAME = re.compile(
+    r"(?:message|msg|text)[,\s]+(\w+)[,\s]+(.+)",
+    re.IGNORECASE,
+)
+# "send a whatsapp to <NAME> saying <MESSAGE>"
+_WA_TO_SAYING = re.compile(
+    r"(?:send|write|compose)\s+(?:a\s+)?" + _WA_KW +
     r"(?:\s+(?:message|msg|text))?"
-    r"(?:\s+to\s+\w+)?"
-    r"\s+(?:saying|that says?|with\s+(?:the\s+)?(?:message|text)?)?\s+[\"']?(.+)[\"']?",
+    r"\s+to\s+(\w+)"
+    r"\s+(?:saying|that says?|with\s+(?:the\s+)?(?:message|text)?)?\s*[\"']?(.+)[\"']?",
     re.IGNORECASE,
 )
-# Fallback: anything after "saying" / "message saying"
-_WA_SAYING = re.compile(
-    r"(?:whatsapp|whats\s*app|watsapp)"
-    r".*?(?:saying|that says?|with message|the message|message saying)\s+[\"']?(.+)[\"']?",
+# "send a whatsapp saying <MESSAGE>"
+_WA_NO_TO = re.compile(
+    r"(?:send|write|compose)\s+(?:a\s+)?" + _WA_KW +
+    r"(?:\s+(?:message|msg|text))?"
+    r"(?:\s+to\s+)?"
+    r"\s+(?:saying|that says?|with\s+(?:the\s+)?(?:message|text)?)\s*[\"']?(.+)[\"']?",
     re.IGNORECASE,
 )
-# Arabic patterns
+# Arabic with recipient
+_WA_AR_TO = re.compile(
+    r"(?:ابعت|أرسل|بعت|ارسل).*?" + _WA_KW +
+    r".*?(?:لـ?|إلى\s*)(\w+)"
+    r".*?(?:قلو|قلها|قللو|رسالة|إنو|انو)?\s*(.+)",
+    re.IGNORECASE,
+)
 _WA_AR = re.compile(
-    r"(?:ابعت|أرسل|بعت|ارسل)"
-    r".*?(?:واتساب|واتس|وتساب)"
-    r".*?(?:قلو|قلها|قللو|بقول|رسالة|إنو|انو)?\s*(.+)",
+    r"(?:ابعت|أرسل|بعت|ارسل).*?" + _WA_KW +
+    r".*?(?:قلو|قلها|قللو|رسالة|إنو|انو)?\s*(.+)",
     re.IGNORECASE,
 )
 
 def detect_whatsapp_intent(text: str):
     """
-    Returns (message_to_send: str) if user wants to send WhatsApp, else None.
-    Matches English and Arabic trigger phrases.
+    Returns (message: str, recipient_name: str|None) if WhatsApp intent detected, else None.
+    recipient_name is the spoken name (e.g. 'Mom', 'John') or None for default contact.
     """
-    t = text.strip()
-    for pattern in (_WA_EN, _WA_SAYING, _WA_AR):
-        m = pattern.search(t)
-        if m:
-            msg = m.group(1).strip().strip('"\'')
-            if msg:
-                return msg
-    # Broad fallback: contains whatsapp keyword at all
+    # Strip punctuation (commas, periods, etc.) that Whisper often inserts
+    t = re.sub(r'[,،.!?]', ' ', text.strip())
+    t = re.sub(r'\s+', ' ', t).strip()
+
+    # Shortest: "whatsapp private hello"
+    m = _WA_SHORT.search(t)
+    if m:
+        name, msg = m.group(1).strip(), m.group(2).strip().strip('"\'')
+        if msg:
+            return msg, name
+
+    # "message private hello"
+    m = _WA_MSG_NAME.search(t)
+    if m:
+        name, msg = m.group(1).strip(), m.group(2).strip().strip('"\'')
+        if msg:
+            return msg, name
+
+    # "send a whatsapp to Mom saying I'll be late"
+    m = _WA_TO_SAYING.search(t)
+    if m:
+        name, msg = m.group(1).strip(), m.group(2).strip().strip('"\'')
+        if msg:
+            return msg, name
+
+    # "send a whatsapp saying hello"
+    m = _WA_NO_TO.search(t)
+    if m:
+        msg = m.group(1).strip().strip('"\'')
+        if msg:
+            return msg, None
+
+    # Arabic with recipient
+    m = _WA_AR_TO.search(t)
+    if m:
+        name, msg = m.group(1).strip(), m.group(2).strip().strip('"\'')
+        if msg:
+            return msg, name
+
+    # Arabic without recipient
+    m = _WA_AR.search(t)
+    if m:
+        msg = m.group(1).strip().strip('"\'')
+        if msg:
+            return msg, None
+
+    # Broad fallback: contains whatsapp keyword
     if re.search(r"whatsapp|whats\s*app|watsapp|واتساب|واتس", t, re.IGNORECASE):
-        # Try to grab text after "saying" / "قلو" / "رسالة"
         after = re.search(
             r"(?:saying|that says?|message saying|قلو|قلها|رسالة|إنو|انو)\s+(.+)",
             t, re.IGNORECASE
         )
         if after:
-            return after.group(1).strip().strip('"\'')
+            return after.group(1).strip().strip('"\''), None
+
     return None
 
 
@@ -152,17 +209,21 @@ async def handle_audio(ws: WebSocket, conv: Conversation, audio_bytes: bytes):
             return
 
         # 3. WhatsApp intent — detected from user's speech directly (no Claude JSON needed)
-        wa_message = detect_whatsapp_intent(user_text)
-        if wa_message:
-            print(f"📱 WhatsApp intent detected. Message: {wa_message!r}")
+        print(f"🔍 Checking WhatsApp intent for: {user_text!r}")
+        wa_result = detect_whatsapp_intent(user_text)
+        print(f"🔍 WhatsApp result: {wa_result!r}")
+        if wa_result:
+            wa_message, wa_recipient = wa_result
+            print(f"📱 WhatsApp intent detected. To: {wa_recipient!r} | Message: {wa_message!r}")
             # Detect language for confirmation
             is_arabic = bool(re.search(r"[؀-ۿ]", user_text))
             if is_arabic:
-                spoken_reply = "تمام، عم بعت الرسالة هلق!"
+                spoken_reply = f"تمام، عم بعت الرسالة{' لـ' + wa_recipient if wa_recipient else ''} هلق!"
             else:
-                spoken_reply = "Got it, sending your WhatsApp message now!"
+                to_str = f" to {wa_recipient}" if wa_recipient else ""
+                spoken_reply = f"Got it, sending your WhatsApp message{to_str} now!"
             try:
-                await run_in_thread(send_whatsapp, wa_message)
+                await run_in_thread(send_whatsapp, wa_message, None, wa_recipient)
             except Exception as wa_err:
                 print(f"❌ WhatsApp send error: {wa_err}")
                 spoken_reply = "Sorry, I couldn't send the WhatsApp message. Please try again."
@@ -181,10 +242,13 @@ async def handle_audio(ws: WebSocket, conv: Conversation, audio_bytes: bytes):
         print(f"🤖 Yehya: {reply!r}")
 
         # 5. TTS → send audio to browser
-        await send_json(ws, {"state": "speaking", "text": reply})
+        await send_json(ws, {"state": "speaking", "text": reply, "user_text": user_text})
         mp3_path = await run_in_thread(speak_to_file, reply)
         await send_audio(ws, mp3_path)
-        await send_json(ws, {"state": "idle"})
+
+        # 6. Generate suggestions after audio sent
+        suggestions = await run_in_thread(generate_suggestions, reply, user_text)
+        await send_json(ws, {"state": "idle", "suggestions": suggestions})
 
     except Exception as e:
         print(f"❌ Pipeline error: {e}")
@@ -194,6 +258,52 @@ async def handle_audio(ws: WebSocket, conv: Conversation, audio_bytes: bytes):
     finally:
         if tmp_audio: cleanup(tmp_audio.name)
         if mp3_path:  cleanup(mp3_path)
+
+# ── Text pipeline (typed input, same as audio but no STT) ────────────────────
+
+async def handle_text(ws: WebSocket, conv: Conversation, user_text: str):
+    """Full pipeline for one typed user message."""
+    mp3_path = None
+    try:
+        print(f"⌨️  Text: {user_text!r}")
+        await send_json(ws, {"state": "thinking", "user_text": user_text})
+
+        # WhatsApp intent check
+        wa_result = detect_whatsapp_intent(user_text)
+        if wa_result:
+            wa_message, wa_recipient = wa_result
+            is_arabic = bool(re.search(r"[؀-ۿ]", user_text))
+            spoken_reply = f"تمام، عم بعت الرسالة{' لـ' + wa_recipient if wa_recipient else ''} هلق!" if is_arabic \
+                           else f"Got it, sending your WhatsApp message{' to ' + wa_recipient if wa_recipient else ''} now!"
+            try:
+                await run_in_thread(send_whatsapp, wa_message, None, wa_recipient)
+            except Exception as wa_err:
+                print(f"❌ WhatsApp error: {wa_err}")
+                spoken_reply = "Sorry, I couldn't send the WhatsApp message."
+            conv.history.append({"role": "user", "content": user_text})
+            conv.history.append({"role": "assistant", "content": spoken_reply})
+        else:
+            spoken_reply = await run_in_thread(conv.send, user_text)
+            spoken_reply = spoken_reply.strip()
+
+        print(f"🤖 Yehya: {spoken_reply!r}")
+
+        await send_json(ws, {"state": "speaking", "text": spoken_reply})
+        mp3_path = await run_in_thread(speak_to_file, spoken_reply)
+        await send_audio(ws, mp3_path)
+
+        # Generate suggestions after audio sent
+        suggestions = await run_in_thread(generate_suggestions, spoken_reply, user_text)
+        await send_json(ws, {"state": "idle", "suggestions": suggestions})
+
+    except Exception as e:
+        print(f"❌ Text pipeline error: {e}")
+        import traceback; traceback.print_exc()
+        await send_json(ws, {"state": "error", "message": str(e)})
+        await send_json(ws, {"state": "idle"})
+    finally:
+        if mp3_path: cleanup(mp3_path)
+
 
 # ── WebSocket endpoint ────────────────────────────────────────────────────────
 
@@ -235,6 +345,14 @@ async def websocket_endpoint(ws: WebSocket):
                     msg = {}
                 if msg.get("action") == "ping":
                     await send_json(ws, {"action": "pong"})
+                elif msg.get("action") == "text_input" and msg.get("text"):
+                    if processing:
+                        continue
+                    processing = True
+                    try:
+                        await handle_text(ws, conv, msg["text"].strip())
+                    finally:
+                        processing = False
 
     except WebSocketDisconnect:
         pass
@@ -318,6 +436,77 @@ async def avatar():
             return FileResponse(str(p))
     svg = '<svg xmlns="http://www.w3.org/2000/svg" width="260" height="300"><rect width="260" height="300" fill="#2a2a3a" rx="130"/><text x="130" y="160" text-anchor="middle" font-size="80" fill="#555">🤖</text></svg>'
     return Response(content=svg, media_type="image/svg+xml")
+
+# ── Contacts management ───────────────────────────────────────────────────────
+
+CONTACTS_FILE = Path(__file__).parent / "contacts.json"
+CONTACTS_PASSCODE = "987987987"
+
+def _load_contacts_file() -> dict:
+    """Load contacts from contacts.json file."""
+    if CONTACTS_FILE.exists():
+        try:
+            return json.loads(CONTACTS_FILE.read_text())
+        except Exception:
+            pass
+    # Fall back to parsing WHATSAPP_CONTACTS env var
+    contacts = {}
+    raw = os.environ.get("WHATSAPP_CONTACTS", "")
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if ":" in entry:
+            parts = entry.split(":", 1)
+            name   = parts[0].strip()
+            number = parts[1].strip()
+            contacts[name] = number
+    return contacts
+
+def _save_contacts_file(contacts: dict):
+    """Save contacts to contacts.json file."""
+    CONTACTS_FILE.write_text(json.dumps(contacts, ensure_ascii=False, indent=2))
+
+@app.get("/contacts")
+async def contacts_page():
+    html_path = Path(__file__).parent / "contacts.html"
+    return HTMLResponse(html_path.read_text())
+
+@app.get("/api/contacts")
+async def api_get_contacts(passcode: str = ""):
+    if passcode != CONTACTS_PASSCODE:
+        return JSONResponse({"error": "Invalid passcode"}, status_code=401)
+    contacts = _load_contacts_file()
+    return JSONResponse({"contacts": [{"name": k, "number": v} for k, v in contacts.items()]})
+
+@app.post("/api/contacts")
+async def api_add_contact(request: Request):
+    body = await request.json()
+    if body.get("passcode") != CONTACTS_PASSCODE:
+        return JSONResponse({"error": "Invalid passcode"}, status_code=401)
+    name   = body.get("name", "").strip()
+    number = body.get("number", "").strip()
+    if not name or not number:
+        return JSONResponse({"error": "Name and number are required"}, status_code=400)
+    # Normalise number
+    if not number.startswith("+"):
+        number = "+" + number
+    contacts = _load_contacts_file()
+    contacts[name] = number
+    _save_contacts_file(contacts)
+    print(f"📋 Contact added: {name} → {number}")
+    return JSONResponse({"ok": True, "name": name, "number": number})
+
+@app.delete("/api/contacts/{name}")
+async def api_delete_contact(name: str, passcode: str = ""):
+    if passcode != CONTACTS_PASSCODE:
+        return JSONResponse({"error": "Invalid passcode"}, status_code=401)
+    contacts = _load_contacts_file()
+    if name not in contacts:
+        return JSONResponse({"error": "Contact not found"}, status_code=404)
+    del contacts[name]
+    _save_contacts_file(contacts)
+    print(f"📋 Contact deleted: {name}")
+    return JSONResponse({"ok": True})
+
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 

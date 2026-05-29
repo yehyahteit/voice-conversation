@@ -7,11 +7,15 @@
   <link rel="icon" type="image/svg+xml" href="/logo">
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
+
     body {
       background:#0a0a12; min-height:100vh;
-      display:flex; flex-direction:column; align-items:center; justify-content:center;
-      font-family:'Segoe UI',system-ui,sans-serif; color:#e0e0f0; overflow:hidden;
+      display:flex; align-items:center; justify-content:center;
+      padding:24px;
+      font-family:'Segoe UI',system-ui,sans-serif; color:#e0e0f0;
+      overflow-y:auto;
     }
+
     #bg { position:fixed; inset:0; z-index:0; opacity:0.2; pointer-events:none; }
 
     .orb { position:fixed; border-radius:50%; filter:blur(80px); pointer-events:none; z-index:0; opacity:0.18; transition:background 0.8s, opacity 0.8s; }
@@ -32,45 +36,44 @@
     body.thinking  .orb2 { background:#a855f7; opacity:0.28; }
     body.thinking  .orb3 { background:#e879f9; opacity:0.18; }
 
+    /* ── Single unified card ── */
     .card {
       position:relative; z-index:1;
-      display:flex; flex-direction:column; align-items:center; gap:24px;
-      padding:40px 56px 36px;
+      display:flex; flex-direction:column; align-items:center;
+      gap:0;
       background:rgba(255,255,255,0.03);
       border:1px solid rgba(255,255,255,0.08);
       border-radius:32px; backdrop-filter:blur(20px);
+      width:420px;
+      overflow:hidden;
     }
-    h1 { font-size:1.1rem; font-weight:600; letter-spacing:0.25em; text-transform:uppercase; color:rgba(255,255,255,0.7); }
+    @media (max-width:480px) { .card { width:100%; border-radius:24px; } }
 
+    /* ── Top section (avatar + controls) ── */
+    .card-top {
+      display:flex; flex-direction:column; align-items:center;
+      gap:16px; padding:32px 36px 24px; width:100%;
+    }
+
+    /* Logo */
     #logoImg {
-      width:64px; height:64px; object-fit:contain;
+      width:52px; height:52px; object-fit:contain;
       animation: logoBob 3s ease-in-out infinite, logoGlow 2.5s ease-in-out infinite;
     }
     @keyframes logoBob {
       0%,100% { transform: translateY(0px) rotate(0deg); }
-      25%      { transform: translateY(-6px) rotate(-3deg); }
-      75%      { transform: translateY(-3px) rotate(3deg); }
+      25%      { transform: translateY(-5px) rotate(-3deg); }
+      75%      { transform: translateY(-2px) rotate(3deg); }
     }
     @keyframes logoGlow {
       0%,100% { filter: drop-shadow(0 0 6px #4f8aff) drop-shadow(0 0 12px #4f8aff); }
       50%      { filter: drop-shadow(0 0 16px #a855f7) drop-shadow(0 0 32px #a855f7); }
     }
 
-    #startBtn {
-      padding:14px 40px; font-size:1rem; font-weight:700;
-      letter-spacing:0.15em; text-transform:uppercase;
-      background:linear-gradient(135deg,#4f8aff,#7c3aed);
-      color:white; border:none; border-radius:50px; cursor:pointer;
-      animation: btnPulse 2s ease-in-out infinite;
-    }
-    #startBtn:hover { transform:scale(1.06); }
-    #startBtn.hidden { display:none; }
-    @keyframes btnPulse {
-      0%,100% { box-shadow: 0 0 16px rgba(79,138,255,0.4); }
-      50%      { box-shadow: 0 0 32px rgba(124,58,237,0.8), 0 0 60px rgba(79,138,255,0.3); }
-    }
+    h1 { font-size:1rem; font-weight:600; letter-spacing:0.25em; text-transform:uppercase; color:rgba(255,255,255,0.7); }
 
-    .avatar-wrap { position:relative; width:280px; height:280px; }
+    /* Avatar */
+    .avatar-wrap { position:relative; width:220px; height:220px; }
     .glow {
       position:absolute; inset:-20px; border-radius:50%;
       opacity:0; filter:blur(28px); transition:opacity 0.5s, background 0.5s; z-index:0;
@@ -80,7 +83,7 @@
     body.speaking  .glow { background:radial-gradient(#fb923c,transparent 70%); opacity:0.65; }
 
     #avatarVideo {
-      position:absolute; inset:0; width:280px; height:280px;
+      position:absolute; inset:0; width:220px; height:220px;
       object-fit:cover; border-radius:50%;
       border:3px solid rgba(255,255,255,0.12); z-index:1;
     }
@@ -100,17 +103,19 @@
     body.thinking .spin-ring { opacity:1; animation:spin 1s linear infinite; }
     @keyframes spin { to{transform:rotate(360deg);} }
 
-    .status-row { display:flex; align-items:center; gap:9px; }
-    .dot { width:8px; height:8px; border-radius:50%; background:#4f8aff; box-shadow:0 0 7px #4f8aff; transition:background 0.4s,box-shadow 0.4s; }
+    /* Status */
+    .status-row { display:flex; align-items:center; gap:8px; }
+    .dot { width:7px; height:7px; border-radius:50%; background:#4f8aff; box-shadow:0 0 7px #4f8aff; transition:background 0.4s,box-shadow 0.4s; }
     body.listening .dot { background:#4cff91; box-shadow:0 0 7px #4cff91; }
     body.thinking  .dot { background:#c084fc; box-shadow:0 0 7px #c084fc; }
     body.speaking  .dot { background:#fb923c; box-shadow:0 0 7px #fb923c; }
     body.error     .dot { background:#f87171; box-shadow:0 0 7px #f87171; }
-    .status-label { font-size:0.78rem; letter-spacing:0.16em; text-transform:uppercase; color:rgba(255,255,255,0.4); }
+    .status-label { font-size:0.75rem; letter-spacing:0.16em; text-transform:uppercase; color:rgba(255,255,255,0.4); }
 
-    .wave-row { display:flex; gap:4px; align-items:flex-end; height:30px; opacity:0; transition:opacity 0.3s; }
+    /* Wave */
+    .wave-row { display:flex; gap:4px; align-items:flex-end; height:24px; opacity:0; transition:opacity 0.3s; }
     body.speaking .wave-row { opacity:1; }
-    .wave-row span { display:block; width:4px; border-radius:3px; background:#fb923c; height:6px; }
+    .wave-row span { display:block; width:3px; border-radius:3px; background:#fb923c; height:4px; }
     body.speaking .wave-row span:nth-child(1){animation:w1 .50s ease-in-out infinite}
     body.speaking .wave-row span:nth-child(2){animation:w2 .60s ease-in-out infinite}
     body.speaking .wave-row span:nth-child(3){animation:w3 .45s ease-in-out infinite}
@@ -118,26 +123,163 @@
     body.speaking .wave-row span:nth-child(5){animation:w5 .50s ease-in-out infinite}
     body.speaking .wave-row span:nth-child(6){animation:w6 .65s ease-in-out infinite}
     body.speaking .wave-row span:nth-child(7){animation:w7 .48s ease-in-out infinite}
-    @keyframes w1{0%,100%{height:4px}  50%{height:24px}}
-    @keyframes w2{0%,100%{height:16px} 50%{height:6px}}
-    @keyframes w3{0%,100%{height:22px} 50%{height:5px}}
-    @keyframes w4{0%,100%{height:8px}  50%{height:26px}}
-    @keyframes w5{0%,100%{height:18px} 50%{height:7px}}
-    @keyframes w6{0%,100%{height:6px}  50%{height:20px}}
-    @keyframes w7{0%,100%{height:20px} 50%{height:8px}}
+    @keyframes w1{0%,100%{height:3px}  50%{height:18px}}
+    @keyframes w2{0%,100%{height:12px} 50%{height:4px}}
+    @keyframes w3{0%,100%{height:16px} 50%{height:3px}}
+    @keyframes w4{0%,100%{height:5px}  50%{height:20px}}
+    @keyframes w5{0%,100%{height:14px} 50%{height:4px}}
+    @keyframes w6{0%,100%{height:4px}  50%{height:15px}}
+    @keyframes w7{0%,100%{height:15px} 50%{height:5px}}
 
-    .transcript { max-width:360px; min-height:3em; font-size:0.98rem; line-height:1.65; text-align:center; color:rgba(255,255,255,0.8); background:rgba(255,255,255,0.05); border-radius:16px; padding:14px 20px; opacity:0; transition:opacity 0.4s; }
-    .transcript.show { opacity:1; }
+    /* Buttons */
+    .btn-row { display:flex; gap:10px; align-items:center; justify-content:center; }
 
-    .conn { position:fixed; top:18px; right:22px; z-index:10; display:flex; align-items:center; gap:6px; font-size:0.7rem; letter-spacing:0.1em; color:rgba(255,255,255,0.3); }
-    .conn-dot { width:7px; height:7px; border-radius:50%; background:#444; transition:background 0.4s; }
+    #startBtn {
+      padding:12px 36px; font-size:0.9rem; font-weight:700;
+      letter-spacing:0.15em; text-transform:uppercase;
+      background:linear-gradient(135deg,#4f8aff,#7c3aed);
+      color:white; border:none; border-radius:50px; cursor:pointer;
+      animation: btnPulse 2s ease-in-out infinite;
+    }
+    #startBtn:hover { transform:scale(1.06); }
+    #startBtn.hidden { display:none; }
+
+    #stopBtn {
+      padding:10px 28px; font-size:0.85rem; font-weight:700;
+      letter-spacing:0.15em; text-transform:uppercase;
+      background:rgba(239,68,68,0.15);
+      color:#f87171; border:1.5px solid rgba(239,68,68,0.4);
+      border-radius:50px; cursor:pointer;
+      transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+      display:none;
+    }
+    #stopBtn:hover { background:rgba(239,68,68,0.3); transform:scale(1.04); box-shadow:0 0 20px rgba(239,68,68,0.3); }
+    #stopBtn:active { transform:scale(0.97); }
+    #stopBtn.visible { display:inline-block; }
+
+    @keyframes btnPulse {
+      0%,100% { box-shadow: 0 0 16px rgba(79,138,255,0.4); }
+      50%      { box-shadow: 0 0 32px rgba(124,58,237,0.8), 0 0 60px rgba(79,138,255,0.3); }
+    }
+
+    /* ── Divider ── */
+    .divider {
+      width:100%; height:1px;
+      background:linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+      display:none;
+    }
+    .divider.visible { display:block; }
+
+    /* ── Chat section (inside card, below avatar) ── */
+    .chat-section {
+      display:none; flex-direction:column;
+      width:100%; gap:0;
+    }
+    .chat-section.visible { display:flex; }
+
+    .chat-section-title {
+      font-size:0.68rem; font-weight:600; letter-spacing:0.18em;
+      text-transform:uppercase; color:rgba(255,255,255,0.3);
+      text-align:center; padding:10px 0 8px;
+    }
+
+    /* Chat scrollable box */
+    .chat-box {
+      width:100%; height:260px;
+      overflow-y:auto; display:flex; flex-direction:column; gap:8px;
+      padding:4px 20px 8px; scroll-behavior:smooth;
+    }
+    /* Custom scrollbar */
+    .chat-box::-webkit-scrollbar { width:4px; }
+    .chat-box::-webkit-scrollbar-track { background:transparent; }
+    .chat-box::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12); border-radius:4px; }
+    .chat-box::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,0.22); }
+
+    .bubble {
+      max-width:82%; padding:10px 14px; border-radius:18px;
+      font-size:0.88rem; line-height:1.5; word-break:break-word;
+      animation:bubbleIn 0.25s ease;
+    }
+    @keyframes bubbleIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    .bubble.user {
+      align-self:flex-end;
+      background:linear-gradient(135deg,#4f8aff,#7c3aed);
+      color:#fff; border-bottom-right-radius:4px;
+    }
+    .bubble.bot {
+      align-self:flex-start;
+      background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.1);
+      color:rgba(255,255,255,0.9); border-bottom-left-radius:4px;
+    }
+
+    /* Suggestion chips */
+    .suggestions {
+      display:flex; flex-wrap:wrap; gap:7px; justify-content:center;
+      padding:6px 20px 10px; width:100%;
+    }
+    .suggestions:empty { display:none; }
+    .chip {
+      padding:6px 13px; border-radius:20px; font-size:0.75rem;
+      background:rgba(79,138,255,0.12); border:1px solid rgba(79,138,255,0.3);
+      color:rgba(255,255,255,0.65); cursor:pointer;
+      transition:background 0.2s, color 0.2s, transform 0.1s;
+      animation:bubbleIn 0.3s ease;
+    }
+    .chip:hover { background:rgba(79,138,255,0.28); color:#fff; transform:scale(1.04); }
+    .chip:active { transform:scale(0.97); }
+
+    /* Text input */
+    .text-input-row {
+      display:none; gap:8px; width:100%;
+      padding:10px 16px 16px; align-items:center;
+    }
+    .text-input-row.visible { display:flex; }
+    .text-input-row input {
+      flex:1; padding:11px 16px; border-radius:24px;
+      background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12);
+      color:#e0e0f0; font-size:0.9rem; font-family:inherit; outline:none;
+      transition:border-color 0.2s;
+    }
+    .text-input-row input:focus { border-color:rgba(79,138,255,0.5); }
+    .text-input-row input::placeholder { color:rgba(255,255,255,0.25); }
+    .text-input-row button {
+      width:40px; height:40px; border-radius:50%; border:none;
+      background:linear-gradient(135deg,#4f8aff,#7c3aed);
+      color:#fff; font-size:1rem; cursor:pointer;
+      transition:transform 0.1s, opacity 0.2s; flex-shrink:0;
+    }
+    .text-input-row button:hover { opacity:0.88; transform:scale(1.08); }
+    .text-input-row button:active { transform:scale(0.94); }
+
+    /* ── Footer strip ── */
+    .card-footer {
+      width:100%; padding:14px 20px 20px;
+      display:flex; flex-direction:column; align-items:center; gap:10px;
+      border-top:1px solid rgba(255,255,255,0.05);
+    }
+
+    .footer-text {
+      font-size:0.7rem; letter-spacing:0.08em; text-align:center;
+      animation:fadeFlow 3s ease-in-out infinite;
+    }
+    @keyframes fadeFlow {
+      0%,100% { color:rgba(255,255,255,0.3); }
+      50%      { color:rgba(100,180,255,0.75); }
+    }
+    .contacts-link {
+      font-size:0.68rem; letter-spacing:0.1em; text-transform:uppercase;
+      color:rgba(255,255,255,0.22); text-decoration:none;
+      padding:4px 14px; border:1px solid rgba(255,255,255,0.07);
+      border-radius:20px; transition:color 0.2s, border-color 0.2s;
+    }
+    .contacts-link:hover { color:rgba(255,255,255,0.55); border-color:rgba(255,255,255,0.22); }
+
+    /* Connection indicator */
+    .conn { position:fixed; top:16px; right:18px; z-index:10; display:flex; align-items:center; gap:5px; font-size:0.68rem; letter-spacing:0.1em; color:rgba(255,255,255,0.3); }
+    .conn-dot { width:6px; height:6px; border-radius:50%; background:#444; transition:background 0.4s; }
     .conn-dot.on  { background:#4cff91; box-shadow:0 0 5px #4cff91; }
     .conn-dot.off { background:#f87171; }
-
-    @keyframes fadeFlow {
-      0%,100% { color:rgba(255,255,255,0.35); }
-      50%      { color:rgba(100,180,255,0.9); }
-    }
   </style>
 </head>
 <body class="idle">
@@ -149,29 +291,52 @@
 <div class="conn"><div class="conn-dot" id="connDot"></div><span id="connLabel">Connecting…</span></div>
 
 <div class="card">
-  <img id="logoImg" src="/logo" alt="Yehya Logo"/>
-  <h1>Talk to YEHYA</h1>
-  <div style="font-size:0.85rem;color:rgba(255,255,255,0.45);letter-spacing:0.05em;text-align:center;line-height:1.6;">
-    👋 Hey, I'm Yehya!<br>🧠 I know things. 😏 Ask me. I dare you.
+
+  <!-- ── Top: avatar + controls ── -->
+  <div class="card-top">
+    <img id="logoImg" src="/logo" alt="Yehya Logo"/>
+    <h1>Talk to YEHYA</h1>
+
+    <div class="avatar-wrap">
+      <div class="glow"></div>
+      <video id="avatarVideo" src="/avatar_video?v=5" poster="/avatar?v=5" playsinline muted preload="auto"></video>
+      <div class="pulse-ring"></div>
+      <div class="spin-ring"></div>
+    </div>
+
+    <div class="status-row">
+      <div class="dot"></div>
+      <div class="status-label" id="statusLabel">Ready</div>
+    </div>
+
+    <div class="btn-row">
+      <button id="startBtn">🎙️ Start</button>
+      <button id="stopBtn">⏹ Stop</button>
+    </div>
+
+    <div class="wave-row"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
   </div>
 
-  <div class="avatar-wrap">
-    <div class="glow"></div>
-    <video id="avatarVideo" src="/avatar_video?v=5" poster="/avatar?v=5" playsinline muted preload="auto"></video>
-    <div class="pulse-ring"></div>
-    <div class="spin-ring"></div>
+  <!-- ── Divider (shown after session starts) ── -->
+  <div class="divider" id="divider"></div>
+
+  <!-- ── Chat section (shown after session starts) ── -->
+  <div class="chat-section" id="chatSection">
+    <div class="chat-section-title">💬 Conversation</div>
+    <div class="chat-box" id="chatBox"></div>
+    <div class="suggestions" id="suggestions"></div>
+    <div class="text-input-row" id="textInputRow">
+      <input id="textInput" type="text" placeholder="Type a message…" autocomplete="off"/>
+      <button id="sendBtn">➤</button>
+    </div>
   </div>
 
-  <div class="status-row">
-    <div class="dot"></div>
-    <div class="status-label" id="statusLabel">Ready</div>
+  <!-- ── Footer ── -->
+  <div class="card-footer">
+    <div class="footer-text">Powered by Yehya Hteit &copy; 2026 — All Rights Reserved</div>
+    <a href="/contacts" class="contacts-link">📋 Manage Contacts</a>
   </div>
-  <button id="startBtn">🎙️ Talk Now</button>
-  <div class="wave-row"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-  <div class="transcript" id="transcript"></div>
-  <div style="font-size:0.75rem;letter-spacing:0.08em;text-align:center;margin-top:8px;animation:fadeFlow 3s ease-in-out infinite;">
-    Powered by Yehya Hteit &copy; 2026 — All Rights Reserved
-  </div>
+
 </div>
 
 <script>
@@ -185,12 +350,56 @@
 })();
 
 // ── Elements ───────────────────────────────────────────────────────────────
-const video       = document.getElementById('avatarVideo');
-const startBtn    = document.getElementById('startBtn');
-const statusLabel = document.getElementById('statusLabel');
-const transcript  = document.getElementById('transcript');
-const connDot     = document.getElementById('connDot');
-const connLabel   = document.getElementById('connLabel');
+const video         = document.getElementById('avatarVideo');
+const startBtn      = document.getElementById('startBtn');
+const stopBtn       = document.getElementById('stopBtn');
+const statusLabel   = document.getElementById('statusLabel');
+const divider       = document.getElementById('divider');
+const chatSection   = document.getElementById('chatSection');
+const chatBox       = document.getElementById('chatBox');
+const suggestionsEl = document.getElementById('suggestions');
+const textInputRow  = document.getElementById('textInputRow');
+const textInput     = document.getElementById('textInput');
+const sendBtn       = document.getElementById('sendBtn');
+const connDot       = document.getElementById('connDot');
+const connLabel     = document.getElementById('connLabel');
+
+// legacy stub — transcript display replaced by chat bubbles
+const transcript = { textContent:'', classList:{ add:()=>{}, remove:()=>{} } };
+
+// ── Chat helpers ───────────────────────────────────────────────────────────
+function addBubble(text, role) {
+  const b = document.createElement('div');
+  b.className = `bubble ${role}`;
+  b.textContent = text;
+  chatBox.appendChild(b);
+  // Auto-scroll to latest message
+  requestAnimationFrame(() => {
+    chatBox.scrollTop = chatBox.scrollHeight;
+  });
+}
+
+function showSuggestions(list) {
+  suggestionsEl.innerHTML = '';
+  if (!list || !list.length) return;
+  list.forEach(s => {
+    const chip = document.createElement('button');
+    chip.className = 'chip';
+    chip.textContent = s;
+    chip.onclick = () => sendTextMessage(s);
+    suggestionsEl.appendChild(chip);
+  });
+  // Scroll to show suggestions too
+  requestAnimationFrame(() => { chatBox.scrollTop = chatBox.scrollHeight; });
+}
+
+function sendTextMessage(text) {
+  if (!text.trim() || !ws || ws.readyState !== WebSocket.OPEN) return;
+  suggestionsEl.innerHTML = '';
+  addBubble(text, 'user');
+  ws.send(JSON.stringify({ action: 'text_input', text }));
+  textInput.value = '';
+}
 
 // ── State machine ──────────────────────────────────────────────────────────
 const LABELS = { idle:'Ready', listening:'Listening…', thinking:'Thinking…', speaking:'Speaking', error:'Error' };
@@ -206,13 +415,6 @@ function setState(state, text='') {
     video.pause();
     video.currentTime = 0;
   }
-
-  if (text && (state === 'speaking' || state === 'error')) {
-    transcript.textContent = (state === 'error' ? '⚠️ ' : '') + text;
-    transcript.classList.add('show');
-  } else if (state === 'idle' || state === 'listening') {
-    transcript.classList.remove('show');
-  }
 }
 
 // ── Audio playback ─────────────────────────────────────────────────────────
@@ -221,7 +423,6 @@ let isPlaying    = false;
 
 function playAudioBytes(arrayBuffer) {
   return new Promise((resolve) => {
-    // Stop any current playback
     if (currentAudio) {
       currentAudio.onended = null;
       currentAudio.onerror = null;
@@ -229,8 +430,8 @@ function playAudioBytes(arrayBuffer) {
       currentAudio = null;
     }
 
-    const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
-    const url  = URL.createObjectURL(blob);
+    const blob  = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+    const url   = URL.createObjectURL(blob);
     const audio = new Audio(url);
     currentAudio = audio;
     isPlaying    = true;
@@ -239,10 +440,19 @@ function playAudioBytes(arrayBuffer) {
       isPlaying = false;
       currentAudio = null;
       URL.revokeObjectURL(url);
+      video.pause();
+      video.currentTime = 0;
       resolve();
     };
     audio.onended = done;
     audio.onerror = done;
+
+    audio.onplay = () => {
+      video.loop = true;
+      video.currentTime = 0;
+      video.play().catch(()=>{});
+    };
+
     audio.play().catch(done);
   });
 }
@@ -259,9 +469,9 @@ function stopPlayback() {
 
 // ── WebSocket ──────────────────────────────────────────────────────────────
 let ws;
-let sessionStarted = false;
-let pendingAudioQueue = [];   // audio that arrived before button click
-let pendingStateQueue = [];   // states that arrived before button click
+let sessionStarted    = false;
+let pendingAudioQueue = [];
+let pendingStateQueue = [];
 
 const WS_PROTO = location.protocol === 'https:' ? 'wss:' : 'ws:';
 
@@ -272,27 +482,18 @@ function connect() {
   ws.onopen = () => {
     connDot.className = 'conn-dot on';
     connLabel.textContent = 'Connected';
-    console.log('✅ WS connected');
   };
 
   ws.onmessage = async (e) => {
     if (e.data instanceof ArrayBuffer) {
-      if (!sessionStarted) {
-        pendingAudioQueue.push(e.data);
-        return;
-      }
+      if (!sessionStarted) { pendingAudioQueue.push(e.data); return; }
       setState('speaking');
       await playAudioBytes(e.data);
       setState('idle');
       startListening();
     } else {
       let m; try { m = JSON.parse(e.data); } catch { return; }
-      console.log('📨 state:', m.state, m.text || '');
-
-      if (!sessionStarted) {
-        pendingStateQueue.push(m);
-        return;
-      }
+      if (!sessionStarted) { pendingStateQueue.push(m); return; }
       applyState(m);
     }
   };
@@ -309,14 +510,17 @@ function connect() {
 connect();
 
 function applyState(m) {
-  // Only apply state from server for non-audio states
-  // (speaking state is managed by playAudioBytes)
   if (m.state === 'thinking') {
-    setState('thinking', '');
+    setState('thinking');
+    suggestionsEl.innerHTML = '';
+  } else if (m.state === 'speaking') {
+    if (m.text) addBubble(m.text, 'bot');
+  } else if (m.state === 'idle') {
+    if (m.suggestions && m.suggestions.length) showSuggestions(m.suggestions);
   } else if (m.state === 'error') {
-    setState('error', m.message || '');
+    setState('error');
+    setTimeout(() => { setState('idle'); startListening(); }, 2000);
   }
-  // idle and speaking states are handled by audio playback flow
 }
 
 // ── Mic recording ──────────────────────────────────────────────────────────
@@ -329,9 +533,9 @@ let recordingActive = false;
 let silenceTimer    = null;
 let hasSpoken       = false;
 
-const SILENCE_MS  = 1500;   // ms of silence before auto-stop
-const MIN_BLOB_SZ = 2000;   // bytes — smaller = silence only, skip
-const MAX_REC_MS  = 25000;  // hard cap 25s
+const SILENCE_MS  = 1500;
+const MIN_BLOB_SZ = 2000;
+const MAX_REC_MS  = 25000;
 
 async function startListening() {
   if (recordingActive || !sessionStarted || isPlaying) return;
@@ -342,49 +546,36 @@ async function startListening() {
     audioChunks     = [];
     hasSpoken       = false;
 
-    // Get mic (reuse stream if we have it)
     if (!audioStream || audioStream.getTracks().every(t => t.readyState === 'ended')) {
-      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      audioStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:false });
     }
 
-    // AudioContext for silence detection
-    if (!audioCtx || audioCtx.state === 'closed') {
-      audioCtx = new AudioContext();
-    }
-    if (audioCtx.state === 'suspended') {
-      await audioCtx.resume();
-    }
+    if (!audioCtx || audioCtx.state === 'closed') audioCtx = new AudioContext();
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+
     const source = audioCtx.createMediaStreamSource(audioStream);
-    analyserNode = audioCtx.createAnalyser();
+    analyserNode  = audioCtx.createAnalyser();
     analyserNode.fftSize = 1024;
     source.connect(analyserNode);
 
-    // MediaRecorder
     const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/ogg'].find(t => MediaRecorder.isTypeSupported(t)) || '';
-    const opts = mimeType ? { mimeType } : {};
-    mediaRecorder = new MediaRecorder(audioStream, opts);
+    mediaRecorder = new MediaRecorder(audioStream, mimeType ? { mimeType } : {});
     mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) audioChunks.push(e.data); };
     mediaRecorder.onstop = onRecordingStop;
-    mediaRecorder.start(250);   // chunk every 250ms
+    mediaRecorder.start(250);
 
-    // Silence detection
     const floatBuf = new Float32Array(analyserNode.fftSize);
     let maxStop = setTimeout(stopRecording, MAX_REC_MS);
 
     const tick = () => {
       if (!recordingActive) { clearTimeout(maxStop); return; }
-
       analyserNode.getFloatTimeDomainData(floatBuf);
-      const rms = Math.sqrt(floatBuf.reduce((s, v) => s + v * v, 0) / floatBuf.length);
-
+      const rms = Math.sqrt(floatBuf.reduce((s,v) => s+v*v, 0) / floatBuf.length);
       if (rms > 0.01) {
         hasSpoken = true;
         if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
       } else if (hasSpoken && !silenceTimer) {
-        silenceTimer = setTimeout(() => {
-          clearTimeout(maxStop);
-          stopRecording();
-        }, SILENCE_MS);
+        silenceTimer = setTimeout(() => { clearTimeout(maxStop); stopRecording(); }, SILENCE_MS);
       }
       requestAnimationFrame(tick);
     };
@@ -392,7 +583,7 @@ async function startListening() {
 
   } catch (err) {
     console.error('Mic error:', err);
-    setState('error', 'Microphone access denied. Please allow mic and refresh.');
+    setState('error');
     recordingActive = false;
   }
 }
@@ -401,60 +592,41 @@ function stopRecording() {
   if (!recordingActive) return;
   recordingActive = false;
   if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop();
-  }
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
 }
 
 async function onRecordingStop() {
   if (audioChunks.length === 0 || !hasSpoken) {
-    // Nothing was said — go back to listening
-    setState('idle');
-    setTimeout(startListening, 300);
-    return;
+    setState('idle'); setTimeout(startListening, 300); return;
   }
-
   const mimeType = mediaRecorder ? mediaRecorder.mimeType : 'audio/webm';
   const blob = new Blob(audioChunks, { type: mimeType });
   audioChunks = [];
-
   if (blob.size < MIN_BLOB_SZ) {
-    setState('idle');
-    setTimeout(startListening, 300);
-    return;
+    setState('idle'); setTimeout(startListening, 300); return;
   }
-
   setState('thinking');
-
   if (ws && ws.readyState === WebSocket.OPEN) {
-    const buf = await blob.arrayBuffer();
-    ws.send(buf);
-    // Server will send audio back → playAudioBytes → startListening
+    ws.send(await blob.arrayBuffer());
   } else {
-    setState('idle');
-    setTimeout(startListening, 1000);
+    setState('idle'); setTimeout(startListening, 1000);
   }
 }
 
 // ── Interrupt monitor ──────────────────────────────────────────────────────
 function startInterruptMonitor() {
-  const monAnalyser = audioCtx.createAnalyser();
-  monAnalyser.fftSize = 512;
-  const src = audioCtx.createMediaStreamSource(audioStream);
-  src.connect(monAnalyser);
-  const buf = new Float32Array(monAnalyser.fftSize);
+  const mon = audioCtx.createAnalyser();
+  mon.fftSize = 512;
+  audioCtx.createMediaStreamSource(audioStream).connect(mon);
+  const buf = new Float32Array(mon.fftSize);
   let loudCount = 0;
-
   const check = () => {
     if (!isPlaying) { loudCount = 0; requestAnimationFrame(check); return; }
-    monAnalyser.getFloatTimeDomainData(buf);
+    mon.getFloatTimeDomainData(buf);
     const rms = Math.sqrt(buf.reduce((s,v)=>s+v*v,0)/buf.length);
     if (rms > 0.05) {
       if (++loudCount >= 4) {
-        console.log('⚡ Interrupt');
-        stopPlayback();
-        setState('idle');
-        loudCount = 0;
+        stopPlayback(); setState('idle'); loudCount = 0;
         setTimeout(startListening, 100);
       }
     } else { loudCount = 0; }
@@ -463,46 +635,63 @@ function startInterruptMonitor() {
   requestAnimationFrame(check);
 }
 
-// ── Start session (button click) ───────────────────────────────────────────
+// ── Start session ──────────────────────────────────────────────────────────
 startBtn.addEventListener('click', async () => {
   try {
-    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    audioStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:false });
     audioCtx    = new AudioContext();
-  } catch (err) {
+  } catch {
     alert('Microphone access is required. Please allow it and try again.');
     return;
   }
 
   startBtn.classList.add('hidden');
+  stopBtn.classList.add('visible');
+  divider.classList.add('visible');
+  chatSection.classList.add('visible');
+  textInputRow.classList.add('visible');
   sessionStarted = true;
 
-  // Unlock video element
   video.loop = true;
   video.play().then(() => { video.pause(); video.currentTime = 0; }).catch(()=>{});
 
-  // Start interrupt monitor
   startInterruptMonitor();
 
-  // Drain queued states
   for (const m of pendingStateQueue) applyState(m);
   pendingStateQueue = [];
 
   if (pendingAudioQueue.length > 0) {
-    // Play queued greeting now that audio is unlocked
-    setState('speaking');
-    for (const buf of pendingAudioQueue) {
-      await playAudioBytes(buf);
-    }
+    for (const buf of pendingAudioQueue) await playAudioBytes(buf);
     pendingAudioQueue = [];
     setState('idle');
     startListening();
   } else {
-    // Greeting might still be coming — wait for it via ws.onmessage
-    // or start listening if ws already sent idle
     setState('idle');
     setTimeout(startListening, 800);
   }
 });
+
+// ── Stop session ───────────────────────────────────────────────────────────
+stopBtn.addEventListener('click', () => {
+  try { stopRecording(); } catch(e){}
+  try { stopPlayback(); } catch(e){}
+  if (audioStream) { audioStream.getTracks().forEach(t => t.stop()); audioStream = null; }
+  if (ws) { try { ws.close(); } catch(e){} ws = null; }
+
+  sessionStarted = false;
+  setState('idle');
+  chatBox.innerHTML = '';
+  suggestionsEl.innerHTML = '';
+  textInputRow.classList.remove('visible');
+  chatSection.classList.remove('visible');
+  divider.classList.remove('visible');
+  stopBtn.classList.remove('visible');
+  startBtn.classList.remove('hidden');
+});
+
+// ── Text input ─────────────────────────────────────────────────────────────
+sendBtn.addEventListener('click', () => sendTextMessage(textInput.value));
+textInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendTextMessage(textInput.value); });
 </script>
 </body>
 </html>

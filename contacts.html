@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Contacts — Yehya</title>
+  <link rel="icon" type="image/svg+xml" href="/logo">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background:#0a0a12; min-height:100vh;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      font-family:'Segoe UI',system-ui,sans-serif; color:#e0e0f0;
+    }
+
+    /* Animated background orbs */
+    .orb { position:fixed; border-radius:50%; filter:blur(80px); pointer-events:none; z-index:0; opacity:0.15; }
+    .orb1 { width:500px; height:500px; background:#4f8aff; top:-100px; left:-150px; animation:orbMove1 12s ease-in-out infinite; }
+    .orb2 { width:400px; height:400px; background:#a855f7; bottom:-100px; right:-100px; animation:orbMove2 15s ease-in-out infinite; }
+    @keyframes orbMove1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(120px,80px)} }
+    @keyframes orbMove2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-100px,-60px)} }
+
+    .container {
+      position:relative; z-index:1;
+      width:100%; max-width:520px;
+      padding:16px;
+    }
+
+    /* ── Lock screen ── */
+    #lockScreen {
+      display:flex; flex-direction:column; align-items:center; gap:24px;
+      padding:48px 40px 40px;
+      background:rgba(255,255,255,0.03);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:32px; backdrop-filter:blur(20px);
+    }
+    #lockScreen h2 { font-size:1.2rem; font-weight:600; letter-spacing:0.15em; color:rgba(255,255,255,0.7); text-transform:uppercase; }
+    #lockScreen p  { font-size:0.85rem; color:rgba(255,255,255,0.4); text-align:center; }
+
+    .lock-icon { font-size:3rem; }
+
+    /* ── Main panel ── */
+    #mainPanel { display:none; flex-direction:column; gap:20px; }
+
+    .panel-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:24px 28px 20px;
+      background:rgba(255,255,255,0.03);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:24px; backdrop-filter:blur(20px);
+    }
+    .panel-header h2 { font-size:1rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:rgba(255,255,255,0.7); }
+    .back-btn {
+      font-size:0.8rem; color:rgba(255,255,255,0.4);
+      background:none; border:1px solid rgba(255,255,255,0.1);
+      border-radius:10px; padding:6px 14px; cursor:pointer;
+      transition:all 0.2s;
+    }
+    .back-btn:hover { color:#fff; border-color:rgba(255,255,255,0.3); }
+
+    /* Add contact form */
+    .add-form {
+      padding:24px 28px;
+      background:rgba(255,255,255,0.03);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:24px; backdrop-filter:blur(20px);
+      display:flex; flex-direction:column; gap:14px;
+    }
+    .add-form h3 { font-size:0.85rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:rgba(255,255,255,0.5); margin-bottom:4px; }
+
+    .field-row { display:flex; gap:10px; }
+
+    input[type="text"], input[type="tel"], input[type="password"] {
+      width:100%; padding:12px 16px;
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.1);
+      border-radius:14px; color:#e0e0f0;
+      font-size:0.95rem; font-family:inherit;
+      outline:none; transition:border-color 0.2s, background 0.2s;
+    }
+    input:focus { border-color:rgba(79,138,255,0.6); background:rgba(79,138,255,0.08); }
+    input::placeholder { color:rgba(255,255,255,0.25); }
+
+    .btn-add {
+      padding:12px 20px;
+      background:linear-gradient(135deg,#4f8aff,#a855f7);
+      border:none; border-radius:14px; color:#fff;
+      font-size:0.95rem; font-weight:600; font-family:inherit;
+      cursor:pointer; transition:opacity 0.2s, transform 0.1s;
+      white-space:nowrap;
+    }
+    .btn-add:hover { opacity:0.88; }
+    .btn-add:active { transform:scale(0.97); }
+
+    /* Contacts list */
+    .contacts-list {
+      padding:24px 28px;
+      background:rgba(255,255,255,0.03);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:24px; backdrop-filter:blur(20px);
+      display:flex; flex-direction:column; gap:10px;
+    }
+    .contacts-list h3 { font-size:0.85rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:rgba(255,255,255,0.5); margin-bottom:6px; }
+
+    .contact-item {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 16px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.07);
+      border-radius:14px;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    .contact-info { display:flex; flex-direction:column; gap:2px; }
+    .contact-name { font-size:0.95rem; font-weight:600; color:#e0e0f0; }
+    .contact-number { font-size:0.8rem; color:rgba(255,255,255,0.4); font-family:monospace; }
+
+    .btn-delete {
+      background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.25);
+      color:#f87171; border-radius:10px; padding:6px 14px;
+      font-size:0.8rem; font-family:inherit; cursor:pointer;
+      transition:all 0.2s;
+    }
+    .btn-delete:hover { background:rgba(239,68,68,0.3); border-color:rgba(239,68,68,0.5); }
+
+    .empty-state { font-size:0.875rem; color:rgba(255,255,255,0.3); text-align:center; padding:12px 0; }
+
+    /* Shared input style for lock screen */
+    .passcode-input {
+      font-size:1.1rem; letter-spacing:0.25em; text-align:center;
+    }
+    .passcode-input::placeholder { letter-spacing:0.05em; font-size:0.9rem; }
+
+    .btn-unlock {
+      width:100%; padding:14px;
+      background:linear-gradient(135deg,#4f8aff,#a855f7);
+      border:none; border-radius:16px; color:#fff;
+      font-size:1rem; font-weight:600; font-family:inherit;
+      cursor:pointer; transition:opacity 0.2s, transform 0.1s;
+    }
+    .btn-unlock:hover { opacity:0.88; }
+    .btn-unlock:active { transform:scale(0.98); }
+
+    .error-msg { font-size:0.85rem; color:#f87171; text-align:center; min-height:20px; }
+    .success-msg { font-size:0.85rem; color:#4ade80; text-align:center; min-height:20px; }
+
+    .sandbox-note {
+      font-size:0.78rem; color:rgba(255,255,255,0.3);
+      background:rgba(255,255,255,0.03);
+      border:1px solid rgba(255,255,255,0.07);
+      border-radius:12px; padding:10px 14px; line-height:1.5;
+    }
+    .sandbox-note strong { color:rgba(255,255,255,0.5); }
+  </style>
+</head>
+<body>
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+
+  <div class="container">
+
+    <!-- Lock screen -->
+    <div id="lockScreen">
+      <div class="lock-icon">🔒</div>
+      <h2>Contacts Manager</h2>
+      <p>Enter your passcode to manage WhatsApp contacts</p>
+      <input id="passcodeInput" type="password" class="passcode-input"
+             placeholder="Enter passcode" maxlength="20"
+             onkeydown="if(event.key==='Enter') unlock()"/>
+      <button class="btn-unlock" onclick="unlock()">Unlock</button>
+      <div id="lockError" class="error-msg"></div>
+    </div>
+
+    <!-- Main panel (hidden until unlocked) -->
+    <div id="mainPanel">
+
+      <div class="panel-header">
+        <h2>📱 WhatsApp Contacts</h2>
+        <button class="back-btn" onclick="window.location.href='/'">← Back to app</button>
+      </div>
+
+      <!-- Add contact form -->
+      <div class="add-form">
+        <h3>Add Contact</h3>
+        <input id="newName" type="text" placeholder="Name (e.g. Mom, John, Ahmad)" />
+        <input id="newNumber" type="tel" placeholder="Number (e.g. +971501234567)" />
+        <button class="btn-add" onclick="addContact()">+ Add Contact</button>
+        <div id="addMsg" class="success-msg"></div>
+        <div class="sandbox-note">
+          <strong>Sandbox note:</strong> Each number must first text
+          <code style="color:#a5b4fc">join properly-pitch</code> to
+          <code style="color:#a5b4fc">+1 415 523 8886</code> on WhatsApp before they can receive messages.
+        </div>
+      </div>
+
+      <!-- Contacts list -->
+      <div class="contacts-list">
+        <h3>Saved Contacts</h3>
+        <div id="contactsList"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let PASSCODE = '';
+
+    async function unlock() {
+      const input = document.getElementById('passcodeInput').value.trim();
+      const errEl = document.getElementById('lockError');
+      errEl.textContent = '';
+
+      const res = await fetch(`/api/contacts?passcode=${encodeURIComponent(input)}`);
+      if (res.status === 401) {
+        errEl.textContent = 'Wrong passcode. Try again.';
+        document.getElementById('passcodeInput').value = '';
+        return;
+      }
+
+      PASSCODE = input;
+      const data = await res.json();
+      document.getElementById('lockScreen').style.display = 'none';
+      document.getElementById('mainPanel').style.display = 'flex';
+      renderContacts(data.contacts);
+    }
+
+    function renderContacts(contacts) {
+      const el = document.getElementById('contactsList');
+      if (!contacts || contacts.length === 0) {
+        el.innerHTML = '<div class="empty-state">No contacts yet. Add one above.</div>';
+        return;
+      }
+      el.innerHTML = contacts.map(c => `
+        <div class="contact-item" id="ci-${encodeURIComponent(c.name)}">
+          <div class="contact-info">
+            <span class="contact-name">${escHtml(c.name)}</span>
+            <span class="contact-number">${escHtml(c.number)}</span>
+          </div>
+          <button class="btn-delete" onclick="deleteContact('${escAttr(c.name)}')">Delete</button>
+        </div>
+      `).join('');
+    }
+
+    async function addContact() {
+      const name   = document.getElementById('newName').value.trim();
+      const number = document.getElementById('newNumber').value.trim();
+      const msgEl  = document.getElementById('addMsg');
+      msgEl.style.color = '#f87171';
+      msgEl.textContent = '';
+
+      if (!name)   { msgEl.textContent = 'Please enter a name.'; return; }
+      if (!number) { msgEl.textContent = 'Please enter a number.'; return; }
+
+      const res = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ passcode: PASSCODE, name, number })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        msgEl.textContent = data.error || 'Failed to add contact.';
+        return;
+      }
+
+      msgEl.style.color = '#4ade80';
+      msgEl.textContent = `✓ ${name} added successfully!`;
+      document.getElementById('newName').value   = '';
+      document.getElementById('newNumber').value = '';
+      setTimeout(() => msgEl.textContent = '', 3000);
+
+      // Reload contacts list
+      const list = await fetch(`/api/contacts?passcode=${encodeURIComponent(PASSCODE)}`);
+      const listData = await list.json();
+      renderContacts(listData.contacts);
+    }
+
+    async function deleteContact(name) {
+      if (!confirm(`Delete contact "${name}"?`)) return;
+      const res = await fetch(`/api/contacts/${encodeURIComponent(name)}?passcode=${encodeURIComponent(PASSCODE)}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        const item = document.getElementById(`ci-${encodeURIComponent(name)}`);
+        if (item) item.remove();
+        const el = document.getElementById('contactsList');
+        if (!el.children.length) {
+          el.innerHTML = '<div class="empty-state">No contacts yet. Add one above.</div>';
+        }
+      }
+    }
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function escAttr(s) {
+      return String(s).replace(/'/g,"\\'");
+    }
+
+    // Allow Enter key on passcode field
+    document.getElementById('passcodeInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') unlock();
+    });
+  </script>
+</body>
+</html>

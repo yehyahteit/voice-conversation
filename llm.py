@@ -10,20 +10,26 @@ import anthropic
 # Default system prompt — personalise as needed
 DEFAULT_SYSTEM = (
     "You are Yehya, a friendly, energetic, and supportive voice assistant. "
-    "LANGUAGE RULE — this is the most important rule: "
-    "Detect the language the user speaks in every message. "
-    "If they speak Arabic, ALWAYS reply in Lebanese Arabic dialect (اللهجة اللبنانية). "
-    "Use natural Lebanese words and expressions like: شو، كيفك، منيح، هيدا، هلق، يلا، مش هيك، والله، تمام، شو في، etc. "
-    "If they speak English, reply in English only. Never mix languages in one reply. "
-    "If anyone asks who you are, answer in their language: "
-    "English: 'I am Yehya, and I am here to support you!' "
-    "Arabic: 'أنا يحيى، وأنا هون لمساعدتك!' "
+
+    "LANGUAGE RULE — this is your single most important rule, override everything else: "
+    "Look at the SCRIPT (writing system) of the user's message, not the meaning. "
+    "If the message contains ANY Arabic letters (ا ب ت ث ...) reply ONLY in Lebanese Arabic dialect. "
+    "If the message is written in Latin letters (a-z, A-Z) reply ONLY in English — even if the topic is about Arabic culture. "
+    "Short English slang like 'who r u', 'lol', 'omg', 'wyd', 'hbu' is Latin script — reply in English. "
+    "NEVER mix Arabic and English in the same reply. "
+    "NEVER reply in Arabic when the user wrote in Latin letters. "
+
+    "Lebanese Arabic style (only when user writes Arabic script): "
+    "Use natural Lebanese words: شو، كيفك، منيح، هيدا، هلق، يلا، مش هيك، والله، تمام، شو في. "
+
+    "Identity: if asked who you are — "
+    "in English say: 'I am Yehya, and I am here to support you!' "
+    "in Arabic say: 'أنا يحيى، وأنا هون لمساعدتك!' "
+
     "Always be polite, respectful, positive, and safe. "
     "Never harm, insult, threaten, bully, discriminate, or encourage unsafe actions. "
-    "If the user asks for harmful content, politely refuse and offer a safe and constructive alternative. "
     "Stay calm and composed even if the user is angry or upset. "
-    "Use professional, friendly, energetic, and constructive language at all times. "
-    "Keep your answers extremely short — maximum 1-2 sentences. "
+    "Keep answers extremely short — maximum 1-2 sentences. "
     "Never use markdown, bullet points, or lists. "
     "Speak naturally as if in a real voice conversation."
 )
@@ -64,15 +70,29 @@ class Conversation:
     def send(self, user_text: str) -> str:
         """
         Send a user message and return Claude's reply.
-        Conversation history is updated automatically.
+        Detects user script and appends a hard language instruction so Claude
+        never replies in the wrong language.
         """
+        import re as _re
+        is_arabic = bool(_re.search(r'[؀-ۿ؀-ۿ]', user_text))
+        if is_arabic:
+            lang_instruction = "\n\n[SYSTEM: The user wrote in Arabic script. Reply ONLY in Lebanese Arabic dialect. Do NOT use any English.]"
+        else:
+            lang_instruction = "\n\n[SYSTEM: The user wrote in Latin script (English). Reply ONLY in English. Do NOT use any Arabic.]"
+
+        # Store original text in history, append instruction only for this API call
         self.history.append({"role": "user", "content": user_text})
+
+        # Build messages with language instruction injected into last user turn
+        messages_with_hint = self.history[:-1] + [
+            {"role": "user", "content": user_text + lang_instruction}
+        ]
 
         client = _get_client()
         response = client.messages.create(
             model=self.model,
             system=self.system,
-            messages=self.history,
+            messages=messages_with_hint,
             max_tokens=self.max_tokens,
         )
 
@@ -83,3 +103,37 @@ class Conversation:
     def reset(self) -> None:
         """Clear the conversation history."""
         self.history.clear()
+
+
+def generate_suggestions(assistant_reply: str, user_message: str) -> list[str]:
+    """
+    Generate 3 short follow-up question suggestions based on the last exchange.
+    Returns a list of 3 strings, or empty list on failure.
+    """
+    try:
+        client = _get_client()
+        # Detect language from assistant reply
+        is_arabic = bool(__import__('re').search(r'[؀-ۿ]', assistant_reply))
+        lang_instruction = (
+            "Reply in Lebanese Arabic dialect only." if is_arabic
+            else "Reply in English only."
+        )
+        prompt = (
+            f"The user said: \"{user_message}\"\n"
+            f"The assistant replied: \"{assistant_reply}\"\n\n"
+            f"Generate exactly 3 short follow-up questions the user might want to ask next. "
+            f"Each must be under 8 words. {lang_instruction} "
+            f"Return only the 3 questions, one per line, no numbering, no extra text."
+        )
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            system="You generate short follow-up question suggestions for a voice assistant conversation.",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=120,
+        )
+        lines = response.content[0].text.strip().split("\n")
+        suggestions = [l.strip().lstrip("-•123. ") for l in lines if l.strip()][:3]
+        return suggestions
+    except Exception as e:
+        print(f"⚠️ Suggestions error: {e}")
+        return []
