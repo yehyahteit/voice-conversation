@@ -40,21 +40,6 @@ executor = ThreadPoolExecutor(max_workers=4)
 
 app = FastAPI()
 
-# Force HTTPS redirect (Railway terminates SSL and sets X-Forwarded-Proto)
-from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import RedirectResponse
-
-class HTTPSRedirect(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        proto = request.headers.get("x-forwarded-proto", "http")
-        if proto == "http" and request.url.hostname not in ("localhost", "127.0.0.1"):
-            url = str(request.url).replace("http://", "https://", 1)
-            return RedirectResponse(url, status_code=301)
-        return await call_next(request)
-
-app.add_middleware(HTTPSRedirect)
-
 EXIT_PHRASES = {"exit", "quit", "goodbye", "bye", "stop", "end"}
 GREETING = "Hello! I'm Yehya, and I'm here to support you!"
 
