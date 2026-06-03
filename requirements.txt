@@ -1,10 +1,7 @@
 # Voice Conversation — Python dependencies
 # Install with: pip install -r requirements.txt
 
-# Anthropic Claude
-anthropic>=0.25.0
-
-# OpenAI (Whisper STT)
+# OpenAI (GPT-4o LLM + Whisper STT)
 openai>=1.20.0
 
 # ElevenLabs TTS
