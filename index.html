@@ -72,6 +72,29 @@
 
     h1 { font-size:1rem; font-weight:600; letter-spacing:0.25em; text-transform:uppercase; color:rgba(255,255,255,0.7); }
 
+    /* Emotion badge */
+    .emotion-badge {
+      position:absolute; top:-6px; right:-6px; z-index:10;
+      font-size:1.5rem; line-height:1;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+      animation: badgePop 0.4s cubic-bezier(0.34,1.56,0.64,1);
+      pointer-events:none;
+    }
+    @keyframes badgePop {
+      from { transform:scale(0) rotate(-20deg); opacity:0; }
+      to   { transform:scale(1) rotate(0deg);   opacity:1; }
+    }
+
+    /* Audio visualizer ring around avatar */
+    #vizCanvas {
+      position:absolute; inset:-18px;
+      width:calc(100% + 36px); height:calc(100% + 36px);
+      border-radius:50%; z-index:2; pointer-events:none;
+      opacity:0; transition:opacity 0.4s;
+    }
+    body.speaking #vizCanvas { opacity:1; }
+    body.listening #vizCanvas { opacity:0.6; }
+
     /* Avatar */
     .avatar-wrap { position:relative; width:220px; height:220px; }
     .glow {
@@ -229,6 +252,20 @@
     .chip:hover { background:rgba(79,138,255,0.28); color:#fff; transform:scale(1.04); }
     .chip:active { transform:scale(0.97); }
 
+    /* WhatsApp open button */
+    .wa-btn {
+      display:inline-flex; align-items:center; gap:6px;
+      margin-top:8px; padding:8px 16px; border-radius:20px;
+      background:linear-gradient(135deg,#25D366,#128C7E);
+      color:#fff; font-size:0.82rem; font-weight:600;
+      border:none; cursor:pointer; text-decoration:none;
+      animation:bubbleIn 0.3s ease;
+      box-shadow: 0 4px 15px rgba(37,211,102,0.35);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .wa-btn:hover { transform:scale(1.05); box-shadow:0 6px 20px rgba(37,211,102,0.5); }
+    .wa-btn:active { transform:scale(0.97); }
+
     /* Text input */
     .text-input-row {
       display:none; gap:8px; width:100%;
@@ -299,9 +336,11 @@
 
     <div class="avatar-wrap">
       <div class="glow"></div>
+      <canvas id="vizCanvas"></canvas>
       <video id="avatarVideo" src="/avatar_video?v=5" poster="/avatar?v=5" playsinline muted preload="auto"></video>
       <div class="pulse-ring"></div>
       <div class="spin-ring"></div>
+      <div class="emotion-badge" id="emotionBadge"></div>
     </div>
 
     <div class="status-row">
@@ -363,20 +402,115 @@ const textInput     = document.getElementById('textInput');
 const sendBtn       = document.getElementById('sendBtn');
 const connDot       = document.getElementById('connDot');
 const connLabel     = document.getElementById('connLabel');
+const emotionBadge  = document.getElementById('emotionBadge');
+const vizCanvas     = document.getElementById('vizCanvas');
 
 // legacy stub — transcript display replaced by chat bubbles
 const transcript = { textContent:'', classList:{ add:()=>{}, remove:()=>{} } };
 
+// ── Emotion badge ──────────────────────────────────────────────────────────
+const EMOTION_EMOJI = {
+  happy:   '😄', sad: '😢', angry: '😠',
+  excited: '🤩', thinking: '🤔', neutral: '😊'
+};
+function showEmotion(emotion) {
+  if (!emotion || emotion === 'neutral') { emotionBadge.textContent = ''; return; }
+  emotionBadge.textContent = EMOTION_EMOJI[emotion] || '';
+  // re-trigger animation
+  emotionBadge.style.animation = 'none';
+  emotionBadge.offsetHeight;
+  emotionBadge.style.animation = '';
+}
+
+// ── Audio Visualizer Ring ──────────────────────────────────────────────────
+let vizAnalyser = null;
+let vizAnimId   = null;
+
+function startViz(analyser) {
+  vizAnalyser = analyser;
+  const ctx  = vizCanvas.getContext('2d');
+  const W    = vizCanvas.width  = vizCanvas.offsetWidth;
+  const H    = vizCanvas.height = vizCanvas.offsetHeight;
+  const cx   = W / 2, cy = H / 2;
+  const baseR = Math.min(W, H) / 2 - 4;
+  const bufLen = analyser.frequencyBinCount;
+  const dataArr = new Uint8Array(bufLen);
+
+  function draw() {
+    vizAnimId = requestAnimationFrame(draw);
+    analyser.getByteFrequencyData(dataArr);
+    ctx.clearRect(0, 0, W, H);
+
+    const slices = 80;
+    const step   = Math.floor(bufLen / slices);
+    const state  = document.body.className;
+    const color  = state === 'speaking'  ? '#fb923c' :
+                   state === 'listening' ? '#4cff91' : '#4f8aff';
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    for (let i = 0; i < slices; i++) {
+      const angle  = (i / slices) * Math.PI * 2 - Math.PI / 2;
+      const val    = dataArr[i * step] / 255;
+      const barLen = val * 22 + 2;
+      const x1 = Math.cos(angle) * baseR;
+      const y1 = Math.sin(angle) * baseR;
+      const x2 = Math.cos(angle) * (baseR + barLen);
+      const y2 = Math.sin(angle) * (baseR + barLen);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth   = 2.5;
+      ctx.globalAlpha = 0.6 + val * 0.4;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  if (vizAnimId) cancelAnimationFrame(vizAnimId);
+  draw();
+}
+
+function stopViz() {
+  if (vizAnimId) { cancelAnimationFrame(vizAnimId); vizAnimId = null; }
+  const ctx = vizCanvas.getContext('2d');
+  ctx.clearRect(0, 0, vizCanvas.width, vizCanvas.height);
+}
+
 // ── Chat helpers ───────────────────────────────────────────────────────────
-function addBubble(text, role) {
+function addBubble(text, role, waLink = null) {
   const b = document.createElement('div');
   b.className = `bubble ${role}`;
-  b.textContent = text;
   chatBox.appendChild(b);
-  // Auto-scroll to latest message
-  requestAnimationFrame(() => {
-    chatBox.scrollTop = chatBox.scrollHeight;
-  });
+
+  if (role === 'bot') {
+    // Live typing animation — word by word
+    const words = text.split(' ');
+    let i = 0;
+    const typeNext = () => {
+      if (i < words.length) {
+        b.textContent += (i === 0 ? '' : ' ') + words[i++];
+        requestAnimationFrame(() => { chatBox.scrollTop = chatBox.scrollHeight; });
+        setTimeout(typeNext, 45);
+      } else if (waLink) {
+        // After typing finishes, show WhatsApp open button
+        const btn = document.createElement('a');
+        btn.href      = waLink;
+        btn.target    = '_blank';
+        btn.rel       = 'noopener noreferrer';
+        btn.className = 'wa-btn';
+        btn.innerHTML = '&#128242; Open WhatsApp';
+        b.appendChild(document.createElement('br'));
+        b.appendChild(btn);
+        requestAnimationFrame(() => { chatBox.scrollTop = chatBox.scrollHeight; });
+      }
+    };
+    typeNext();
+  } else {
+    b.textContent = text;
+    requestAnimationFrame(() => { chatBox.scrollTop = chatBox.scrollHeight; });
+  }
+  return b;
 }
 
 function showSuggestions(list) {
@@ -442,6 +576,7 @@ function playAudioBytes(arrayBuffer) {
       URL.revokeObjectURL(url);
       video.pause();
       video.currentTime = 0;
+      stopViz();
       resolve();
     };
     audio.onended = done;
@@ -451,6 +586,16 @@ function playAudioBytes(arrayBuffer) {
       video.loop = true;
       video.currentTime = 0;
       video.play().catch(()=>{});
+      // Hook visualizer to audio output
+      try {
+        if (!audioCtx || audioCtx.state === 'closed') audioCtx = new AudioContext();
+        const src  = audioCtx.createMediaElementSource(audio);
+        const anal = audioCtx.createAnalyser();
+        anal.fftSize = 256;
+        src.connect(anal);
+        src.connect(audioCtx.destination);
+        startViz(anal);
+      } catch(e) { /* fallback: viz not critical */ }
     };
 
     audio.play().catch(done);
@@ -514,7 +659,8 @@ function applyState(m) {
     setState('thinking');
     suggestionsEl.innerHTML = '';
   } else if (m.state === 'speaking') {
-    if (m.text) addBubble(m.text, 'bot');
+    if (m.text) addBubble(m.text, 'bot', m.whatsapp_link || null);
+    if (m.emotion) showEmotion(m.emotion);
   } else if (m.state === 'idle') {
     if (m.suggestions && m.suggestions.length) showSuggestions(m.suggestions);
   } else if (m.state === 'error') {
@@ -557,6 +703,7 @@ async function startListening() {
     analyserNode  = audioCtx.createAnalyser();
     analyserNode.fftSize = 1024;
     source.connect(analyserNode);
+    startViz(analyserNode);
 
     const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/ogg'].find(t => MediaRecorder.isTypeSupported(t)) || '';
     mediaRecorder = new MediaRecorder(audioStream, mimeType ? { mimeType } : {});
@@ -593,6 +740,7 @@ function stopRecording() {
   recordingActive = false;
   if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
   if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  stopViz();
 }
 
 async function onRecordingStop() {

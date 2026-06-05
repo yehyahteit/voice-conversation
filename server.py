@@ -33,7 +33,27 @@ load_dotenv()
 from stt import transcribe
 from llm import Conversation, generate_suggestions
 from tts import speak_to_file
-from whatsapp import send_whatsapp
+from whatsapp import build_deep_link
+
+# ── Emotion detection ─────────────────────────────────────────────────────────
+_EMOTION_MAP = {
+    "happy":   ["happy","great","awesome","love","haha","lol","yay","amazing","wonderful","excited","glad","joy","fantastic","good","nice","مبسوط","كتير منيح","رائع","يسلمو","الحمدلله"],
+    "sad":     ["sad","miss","lonely","cry","crying","depressed","upset","sorry","hurt","pain","حزين","زعلان","بكي","وحيد","مش منيح"],
+    "angry":   ["angry","mad","hate","stupid","annoying","frustrated","shut","damn","ugh","كرهت","غاضب","زعلان","انرفزت"],
+    "excited": ["wow","omg","wait","seriously","no way","really","can't believe","finally","يا إلهي","جد","مش معقول","والله جد"],
+    "thinking":["hmm","let me","wonder","maybe","think","not sure","يمكن","بفكر","مش عارف"],
+}
+
+def detect_emotion(text: str) -> str:
+    """Return one of: happy, sad, angry, excited, thinking, neutral."""
+    t = text.lower()
+    scores = {e: 0 for e in _EMOTION_MAP}
+    for emotion, keywords in _EMOTION_MAP.items():
+        for kw in keywords:
+            if kw in t:
+                scores[emotion] += 1
+    best = max(scores, key=scores.get)
+    return best if scores[best] > 0 else "neutral"
 
 # Thread pool for blocking I/O (Whisper + ElevenLabs are sync)
 executor = ThreadPoolExecutor(max_workers=4)
@@ -215,22 +235,16 @@ async def handle_audio(ws: WebSocket, conv: Conversation, audio_bytes: bytes):
         if wa_result:
             wa_message, wa_recipient = wa_result
             print(f"📱 WhatsApp intent detected. To: {wa_recipient!r} | Message: {wa_message!r}")
-            # Detect language for confirmation
             is_arabic = bool(re.search(r"[؀-ۿ]", user_text))
             if is_arabic:
-                spoken_reply = f"تمام، عم بعت الرسالة{' لـ' + wa_recipient if wa_recipient else ''} هلق!"
+                spoken_reply = f"تمام! افتح واتساب وابعت الرسالة{' لـ' + wa_recipient if wa_recipient else ''}!"
             else:
                 to_str = f" to {wa_recipient}" if wa_recipient else ""
-                spoken_reply = f"Got it, sending your WhatsApp message{to_str} now!"
-            try:
-                await run_in_thread(send_whatsapp, wa_message, None, wa_recipient)
-            except Exception as wa_err:
-                print(f"❌ WhatsApp send error: {wa_err}")
-                spoken_reply = "Sorry, I couldn't send the WhatsApp message. Please try again."
-            # Also add to conversation history so Claude knows what happened
+                spoken_reply = f"Opening WhatsApp{to_str} — just tap Send!"
+            deep_link = build_deep_link(wa_message, wa_recipient)
             conv.history.append({"role": "user", "content": user_text})
             conv.history.append({"role": "assistant", "content": spoken_reply})
-            await send_json(ws, {"state": "speaking", "text": spoken_reply})
+            await send_json(ws, {"state": "speaking", "text": spoken_reply, "whatsapp_link": deep_link})
             mp3_path = await run_in_thread(speak_to_file, spoken_reply)
             await send_audio(ws, mp3_path)
             await send_json(ws, {"state": "idle"})
@@ -242,7 +256,8 @@ async def handle_audio(ws: WebSocket, conv: Conversation, audio_bytes: bytes):
         print(f"🤖 Yehya: {reply!r}")
 
         # 5. TTS → send audio to browser
-        await send_json(ws, {"state": "speaking", "text": reply, "user_text": user_text})
+        emotion = detect_emotion(user_text)
+        await send_json(ws, {"state": "speaking", "text": reply, "user_text": user_text, "emotion": emotion})
         mp3_path = await run_in_thread(speak_to_file, reply)
         await send_audio(ws, mp3_path)
 
@@ -273,13 +288,12 @@ async def handle_text(ws: WebSocket, conv: Conversation, user_text: str):
         if wa_result:
             wa_message, wa_recipient = wa_result
             is_arabic = bool(re.search(r"[؀-ۿ]", user_text))
-            spoken_reply = f"تمام، عم بعت الرسالة{' لـ' + wa_recipient if wa_recipient else ''} هلق!" if is_arabic \
-                           else f"Got it, sending your WhatsApp message{' to ' + wa_recipient if wa_recipient else ''} now!"
-            try:
-                await run_in_thread(send_whatsapp, wa_message, None, wa_recipient)
-            except Exception as wa_err:
-                print(f"❌ WhatsApp error: {wa_err}")
-                spoken_reply = "Sorry, I couldn't send the WhatsApp message."
+            if is_arabic:
+                spoken_reply = f"تمام! افتح واتساب وابعت الرسالة{' لـ' + wa_recipient if wa_recipient else ''}!"
+            else:
+                to_str = f" to {wa_recipient}" if wa_recipient else ""
+                spoken_reply = f"Opening WhatsApp{to_str} — just tap Send!"
+            deep_link = build_deep_link(wa_message, wa_recipient)
             conv.history.append({"role": "user", "content": user_text})
             conv.history.append({"role": "assistant", "content": spoken_reply})
         else:
@@ -288,7 +302,9 @@ async def handle_text(ws: WebSocket, conv: Conversation, user_text: str):
 
         print(f"🤖 Yehya: {spoken_reply!r}")
 
-        await send_json(ws, {"state": "speaking", "text": spoken_reply})
+        emotion = detect_emotion(user_text)
+        extra = {"whatsapp_link": deep_link} if wa_result else {}
+        await send_json(ws, {"state": "speaking", "text": spoken_reply, "emotion": emotion, **extra})
         mp3_path = await run_in_thread(speak_to_file, spoken_reply)
         await send_audio(ws, mp3_path)
 

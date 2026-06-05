@@ -16,5 +16,4 @@ uvicorn>=0.29.0
 websockets>=12.0
 python-multipart>=0.0.9
 
-# Twilio WhatsApp
-twilio>=9.0.0
+# WhatsApp — via wa.me deep links (no third party needed)
