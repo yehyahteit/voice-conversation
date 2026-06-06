@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Talk to YEHYA</title>
   <link rel="icon" type="image/svg+xml" href="/logo">
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0a0a12">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Yehya">
+  <link rel="apple-touch-icon" href="/icon-192">
+  <meta name="mobile-web-app-capable" content="yes">
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
 
@@ -317,6 +326,32 @@
     .conn-dot { width:6px; height:6px; border-radius:50%; background:#444; transition:background 0.4s; }
     .conn-dot.on  { background:#4cff91; box-shadow:0 0 5px #4cff91; }
     .conn-dot.off { background:#f87171; }
+
+    /* PWA install banner */
+    #installBanner {
+      display:none; position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+      z-index:100; background:rgba(15,15,30,0.95);
+      border:1px solid rgba(79,138,255,0.4); border-radius:20px;
+      padding:14px 20px; gap:12px; align-items:center;
+      box-shadow:0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(79,138,255,0.15);
+      backdrop-filter:blur(20px); white-space:nowrap;
+      animation: slideUp 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    #installBanner.show { display:flex; }
+    @keyframes slideUp {
+      from { opacity:0; transform:translateX(-50%) translateY(20px); }
+      to   { opacity:1; transform:translateX(-50%) translateY(0); }
+    }
+    #installBanner span { font-size:0.82rem; color:rgba(255,255,255,0.8); }
+    #installBtn {
+      padding:8px 18px; border-radius:14px; border:none; cursor:pointer;
+      background:linear-gradient(135deg,#4f8aff,#7c3aed);
+      color:#fff; font-size:0.8rem; font-weight:700; letter-spacing:0.08em;
+    }
+    #installDismiss {
+      background:none; border:none; color:rgba(255,255,255,0.3);
+      font-size:1rem; cursor:pointer; padding:0 4px;
+    }
   </style>
 </head>
 <body class="idle">
@@ -376,6 +411,13 @@
     <a href="/contacts" class="contacts-link">📋 Manage Contacts</a>
   </div>
 
+</div>
+
+<!-- PWA Install Banner -->
+<div id="installBanner">
+  <span>📱 Install Yehya as an app</span>
+  <button id="installBtn">Install</button>
+  <button id="installDismiss">✕</button>
 </div>
 
 <script>
@@ -840,6 +882,45 @@ stopBtn.addEventListener('click', () => {
 // ── Text input ─────────────────────────────────────────────────────────────
 sendBtn.addEventListener('click', () => sendTextMessage(textInput.value));
 textInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendTextMessage(textInput.value); });
+
+// ── PWA: Service Worker + Install Prompt ───────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+      console.log('✅ SW registered:', reg.scope);
+    }).catch(err => console.log('SW error:', err));
+  });
+}
+
+let deferredInstallPrompt = null;
+const installBanner  = document.getElementById('installBanner');
+const installBtn     = document.getElementById('installBtn');
+const installDismiss = document.getElementById('installDismiss');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  installBanner.classList.add('show');
+});
+
+installBtn.addEventListener('click', async () => {
+  if (!deferredInstallPrompt) return;
+  installBanner.classList.remove('show');
+  deferredInstallPrompt.prompt();
+  const { outcome } = await deferredInstallPrompt.userChoice;
+  console.log('PWA install outcome:', outcome);
+  deferredInstallPrompt = null;
+});
+
+installDismiss.addEventListener('click', () => {
+  installBanner.classList.remove('show');
+});
+
+window.addEventListener('appinstalled', () => {
+  installBanner.classList.remove('show');
+  deferredInstallPrompt = null;
+  console.log('✅ Yehya PWA installed!');
+});
 </script>
 </body>
 </html>

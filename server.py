@@ -436,6 +436,47 @@ async def avatar_video(request: Request):
             "Content-Type":   "video/mp4",
         })
 
+@app.get("/manifest.json")
+async def manifest():
+    p = Path(__file__).parent / "manifest.json"
+    return FileResponse(str(p), media_type="application/manifest+json")
+
+@app.get("/sw.js")
+async def service_worker():
+    p = Path(__file__).parent / "sw.js"
+    return FileResponse(str(p), media_type="application/javascript", headers={
+        "Service-Worker-Allowed": "/"
+    })
+
+@app.get("/icon-192")
+async def icon192():
+    base = Path(__file__).parent
+    for name in ("icon-192.png", "logo.png", "avatar.png", "avatar.jpg"):
+        p = base / name
+        if p.exists():
+            return FileResponse(str(p), media_type="image/png")
+    # Fallback: generate a simple SVG-based icon
+    svg = '''<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192">
+      <rect width="192" height="192" rx="40" fill="#0a0a12"/>
+      <circle cx="96" cy="96" r="70" fill="none" stroke="#4f8aff" stroke-width="4"/>
+      <text x="96" y="115" text-anchor="middle" font-size="72" font-family="system-ui">🎙️</text>
+    </svg>'''
+    return Response(content=svg, media_type="image/svg+xml")
+
+@app.get("/icon-512")
+async def icon512():
+    base = Path(__file__).parent
+    for name in ("icon-512.png", "logo.png", "avatar.png", "avatar.jpg"):
+        p = base / name
+        if p.exists():
+            return FileResponse(str(p), media_type="image/png")
+    svg = '''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512">
+      <rect width="512" height="512" rx="100" fill="#0a0a12"/>
+      <circle cx="256" cy="256" r="200" fill="none" stroke="#4f8aff" stroke-width="8"/>
+      <text x="256" y="310" text-anchor="middle" font-size="200" font-family="system-ui">🎙️</text>
+    </svg>'''
+    return Response(content=svg, media_type="image/svg+xml")
+
 @app.get("/logo")
 async def logo():
     p = Path(__file__).parent / "logo.svg"
