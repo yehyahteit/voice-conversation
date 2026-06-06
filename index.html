@@ -275,6 +275,69 @@
     .wa-btn:hover { transform:scale(1.05); box-shadow:0 6px 20px rgba(37,211,102,0.5); }
     .wa-btn:active { transform:scale(0.97); }
 
+    /* Features button */
+    #featuresBtn {
+      background:none; border:1px solid rgba(255,255,255,0.12);
+      border-radius:20px; padding:5px 14px; font-size:0.72rem;
+      letter-spacing:0.12em; text-transform:uppercase;
+      color:rgba(255,255,255,0.35); cursor:pointer;
+      transition:color 0.2s, border-color 0.2s;
+    }
+    #featuresBtn:hover { color:rgba(255,255,255,0.7); border-color:rgba(255,255,255,0.3); }
+
+    /* Features modal overlay */
+    #featuresModal {
+      display:none; position:fixed; inset:0; z-index:500;
+      background:rgba(0,0,0,0.7); backdrop-filter:blur(8px);
+      align-items:center; justify-content:center; padding:20px;
+    }
+    #featuresModal.open { display:flex; }
+    .features-card {
+      background:#0f0f1e; border:1px solid rgba(255,255,255,0.1);
+      border-radius:28px; padding:28px 24px; width:100%; max-width:400px;
+      max-height:85vh; overflow-y:auto;
+      animation: modalPop 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes modalPop {
+      from { opacity:0; transform:scale(0.88) translateY(20px); }
+      to   { opacity:1; transform:scale(1)    translateY(0); }
+    }
+    .features-card::-webkit-scrollbar { width:4px; }
+    .features-card::-webkit-scrollbar-track { background:transparent; }
+    .features-card::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:4px; }
+    .features-header {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:20px;
+    }
+    .features-header h2 {
+      font-size:1rem; font-weight:700; letter-spacing:0.18em;
+      text-transform:uppercase;
+      background:linear-gradient(135deg,#4f8aff,#a855f7);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      background-clip:text;
+    }
+    .features-close {
+      background:none; border:none; color:rgba(255,255,255,0.3);
+      font-size:1.2rem; cursor:pointer; padding:0 4px;
+      transition:color 0.2s;
+    }
+    .features-close:hover { color:#fff; }
+    .features-group { margin-bottom:20px; }
+    .features-group-title {
+      font-size:0.68rem; font-weight:700; letter-spacing:0.2em;
+      text-transform:uppercase; color:rgba(255,255,255,0.3);
+      margin-bottom:10px; padding-bottom:6px;
+      border-bottom:1px solid rgba(255,255,255,0.06);
+    }
+    .feature-item {
+      display:flex; align-items:flex-start; gap:10px;
+      padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04);
+    }
+    .feature-item:last-child { border-bottom:none; }
+    .feature-icon { font-size:1.1rem; flex-shrink:0; margin-top:1px; }
+    .feature-text { font-size:0.82rem; color:rgba(255,255,255,0.65); line-height:1.45; }
+    .feature-text strong { color:rgba(255,255,255,0.9); font-weight:600; }
+
     /* Text input */
     .text-input-row {
       display:none; gap:8px; width:100%;
@@ -321,6 +384,66 @@
     }
     .contacts-link:hover { color:rgba(255,255,255,0.55); border-color:rgba(255,255,255,0.22); }
 
+    /* ── Splash screen ── */
+    #splash {
+      position:fixed; inset:0; z-index:9999;
+      background:#0a0a12;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:24px;
+      animation: splashFadeOut 0.6s ease 3.2s forwards;
+    }
+    @keyframes splashFadeOut {
+      to { opacity:0; pointer-events:none; }
+    }
+    .splash-logo {
+      width:80px; height:80px; object-fit:contain;
+      animation: splashLogoPop 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.3s both;
+      filter: drop-shadow(0 0 24px #4f8aff) drop-shadow(0 0 48px #7c3aed);
+    }
+    @keyframes splashLogoPop {
+      from { transform:scale(0) rotate(-15deg); opacity:0; }
+      to   { transform:scale(1) rotate(0deg);   opacity:1; }
+    }
+    .splash-title {
+      font-size:2rem; font-weight:800; letter-spacing:0.12em;
+      text-transform:uppercase;
+      background:linear-gradient(135deg,#4f8aff,#a855f7,#fb923c);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      background-clip:text;
+      animation: splashSlideUp 0.6s ease 0.7s both;
+    }
+    @keyframes splashSlideUp {
+      from { opacity:0; transform:translateY(20px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .splash-sub {
+      font-size:0.85rem; letter-spacing:0.22em; text-transform:uppercase;
+      color:rgba(255,255,255,0.4);
+      animation: splashSlideUp 0.6s ease 1s both;
+    }
+    .splash-powered {
+      font-size:0.75rem; letter-spacing:0.15em;
+      color:rgba(255,255,255,0.25);
+      animation: splashSlideUp 0.6s ease 1.3s both;
+    }
+    .splash-powered span {
+      color:rgba(79,138,255,0.8); font-weight:600;
+    }
+    .splash-bar {
+      width:180px; height:3px; border-radius:3px;
+      background:rgba(255,255,255,0.08); overflow:hidden;
+      animation: splashSlideUp 0.4s ease 1.5s both;
+    }
+    .splash-bar-fill {
+      height:100%; border-radius:3px;
+      background:linear-gradient(90deg,#4f8aff,#a855f7,#fb923c);
+      animation: splashBarFill 1.4s ease 1.6s both;
+    }
+    @keyframes splashBarFill {
+      from { width:0%; }
+      to   { width:100%; }
+    }
+
     /* Connection indicator */
     .conn { position:fixed; top:16px; right:18px; z-index:10; display:flex; align-items:center; gap:5px; font-size:0.68rem; letter-spacing:0.1em; color:rgba(255,255,255,0.3); }
     .conn-dot { width:6px; height:6px; border-radius:50%; background:#444; transition:background 0.4s; }
@@ -356,6 +479,69 @@
 </head>
 <body class="idle">
 
+<!-- Features Modal -->
+<div id="featuresModal">
+  <div class="features-card">
+    <div class="features-header">
+      <h2>✨ Features</h2>
+      <button class="features-close" id="featuresClose">✕</button>
+    </div>
+
+    <div class="features-group">
+      <div class="features-group-title">🎙️ Voice</div>
+      <div class="feature-item"><div class="feature-icon">🎤</div><div class="feature-text"><strong>Voice Conversation</strong> — Talk naturally, Yehya listens and replies out loud</div></div>
+      <div class="feature-item"><div class="feature-icon">🔇</div><div class="feature-text"><strong>Silence Detection</strong> — Auto-stops recording when you finish speaking</div></div>
+      <div class="feature-item"><div class="feature-icon">✋</div><div class="feature-text"><strong>Interrupt</strong> — Speak while Yehya is talking to stop it instantly</div></div>
+    </div>
+
+    <div class="features-group">
+      <div class="features-group-title">💬 Chat</div>
+      <div class="feature-item"><div class="feature-icon">⌨️</div><div class="feature-text"><strong>Text Input</strong> — Type messages alongside voice</div></div>
+      <div class="feature-item"><div class="feature-icon">✍️</div><div class="feature-text"><strong>Live Typing</strong> — Replies appear word by word like ChatGPT</div></div>
+      <div class="feature-item"><div class="feature-icon">💡</div><div class="feature-text"><strong>Smart Suggestions</strong> — Follow-up question chips after every reply</div></div>
+    </div>
+
+    <div class="features-group">
+      <div class="features-group-title">🧠 AI</div>
+      <div class="feature-item"><div class="feature-icon">🤖</div><div class="feature-text"><strong>GPT-4o</strong> — Powered by OpenAI's most capable model</div></div>
+      <div class="feature-item"><div class="feature-icon">🇱🇧</div><div class="feature-text"><strong>Lebanese Arabic</strong> — Detects your language and replies in Lebanese dialect or English</div></div>
+      <div class="feature-item"><div class="feature-icon">🧵</div><div class="feature-text"><strong>Memory</strong> — Remembers the full conversation context</div></div>
+      <div class="feature-item"><div class="feature-icon">😄</div><div class="feature-text"><strong>Emotion Detection</strong> — Detects your mood and shows an emoji on the avatar</div></div>
+    </div>
+
+    <div class="features-group">
+      <div class="features-group-title">🌊 Visual</div>
+      <div class="feature-item"><div class="feature-icon">🔊</div><div class="feature-text"><strong>Audio Visualizer</strong> — Real-time frequency ring glows around the avatar</div></div>
+      <div class="feature-item"><div class="feature-icon">🌈</div><div class="feature-text"><strong>Dynamic Orbs</strong> — Background changes color based on state</div></div>
+      <div class="feature-item"><div class="feature-icon">💫</div><div class="feature-text"><strong>Thinking Animation</strong> — Spinning ring while processing your request</div></div>
+    </div>
+
+    <div class="features-group">
+      <div class="features-group-title">📱 WhatsApp</div>
+      <div class="feature-item"><div class="feature-icon">💬</div><div class="feature-text"><strong>Send Messages</strong> — Say "WhatsApp [name] [message]" to send via WhatsApp</div></div>
+      <div class="feature-item"><div class="feature-icon">📒</div><div class="feature-text"><strong>Contacts</strong> — Manage your contacts from the /contacts page</div></div>
+      <div class="feature-item"><div class="feature-icon">🔗</div><div class="feature-text"><strong>Deep Link</strong> — Opens WhatsApp natively on your phone, no third party</div></div>
+    </div>
+
+    <div class="features-group">
+      <div class="features-group-title">📲 Mobile</div>
+      <div class="feature-item"><div class="feature-icon">📥</div><div class="feature-text"><strong>Installable PWA</strong> — Install as a native app on your S25 Ultra or iPhone</div></div>
+      <div class="feature-item"><div class="feature-icon">🖥️</div><div class="feature-text"><strong>Full Screen</strong> — No browser bar, looks and feels like a real app</div></div>
+      <div class="feature-item"><div class="feature-icon">🔒</div><div class="feature-text"><strong>HTTPS</strong> — Secure connection at voice.yehyai.org</div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Splash Screen -->
+<div id="splash">
+  <img class="splash-logo" src="/logo" alt="Yehya"/>
+  <div class="splash-title">YEHYA AI</div>
+  <div class="splash-sub">Your Personal Voice Assistant</div>
+  <div class="splash-powered">Powered by <span>Yehya Hteit</span></div>
+  <div class="splash-bar"><div class="splash-bar-fill"></div></div>
+</div>
+
 <canvas id="bg"></canvas>
 <div class="orb orb1"></div>
 <div class="orb orb2"></div>
@@ -372,7 +558,8 @@
     <div class="avatar-wrap">
       <div class="glow"></div>
       <canvas id="vizCanvas"></canvas>
-      <video id="avatarVideo" src="/avatar_video?v=5" poster="/avatar?v=5" playsinline muted preload="auto"></video>
+      <img id="avatarImg" src="/avatar?v=5" alt="Yehya" style="position:absolute;inset:0;width:220px;height:220px;object-fit:cover;border-radius:50%;border:3px solid rgba(255,255,255,0.12);z-index:1;"/>
+      <video id="avatarVideo" src="/avatar_video?v=5" poster="/avatar?v=5" playsinline muted preload="auto" style="display:none;position:absolute;inset:0;width:220px;height:220px;object-fit:cover;border-radius:50%;border:3px solid rgba(255,255,255,0.12);z-index:1;"></video>
       <div class="pulse-ring"></div>
       <div class="spin-ring"></div>
       <div class="emotion-badge" id="emotionBadge"></div>
@@ -408,7 +595,10 @@
   <!-- ── Footer ── -->
   <div class="card-footer">
     <div class="footer-text">Powered by Yehya Hteit &copy; 2026 — All Rights Reserved</div>
-    <a href="/contacts" class="contacts-link">📋 Manage Contacts</a>
+    <div style="font-size:0.62rem;letter-spacing:0.12em;color:rgba(255,255,255,0.18);margin-top:-4px;">v1.0.0</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;">
+      <button id="featuresBtn">✨ Features</button>
+    </div>
   </div>
 
 </div>
@@ -446,6 +636,7 @@ const connDot       = document.getElementById('connDot');
 const connLabel     = document.getElementById('connLabel');
 const emotionBadge  = document.getElementById('emotionBadge');
 const vizCanvas     = document.getElementById('vizCanvas');
+const avatarImg     = document.getElementById('avatarImg');
 
 // legacy stub — transcript display replaced by chat bubbles
 const transcript = { textContent:'', classList:{ add:()=>{}, remove:()=>{} } };
@@ -585,11 +776,15 @@ function setState(state, text='') {
   statusLabel.textContent = LABELS[state] || state;
 
   if (state === 'speaking') {
+    avatarImg.style.display = 'none';
+    video.style.display = 'block';
     video.loop = true;
     video.play().catch(()=>{});
   } else {
     video.pause();
     video.currentTime = 0;
+    video.style.display = 'none';
+    avatarImg.style.display = 'block';
   }
 }
 
@@ -618,6 +813,8 @@ function playAudioBytes(arrayBuffer) {
       URL.revokeObjectURL(url);
       video.pause();
       video.currentTime = 0;
+      video.style.display = 'none';
+      avatarImg.style.display = 'block';
       stopViz();
       resolve();
     };
@@ -842,8 +1039,8 @@ startBtn.addEventListener('click', async () => {
   textInputRow.classList.add('visible');
   sessionStarted = true;
 
-  video.loop = true;
-  video.play().then(() => { video.pause(); video.currentTime = 0; }).catch(()=>{});
+  video.pause();
+  video.currentTime = 0;
 
   startInterruptMonitor();
 
@@ -882,6 +1079,18 @@ stopBtn.addEventListener('click', () => {
 // ── Text input ─────────────────────────────────────────────────────────────
 sendBtn.addEventListener('click', () => sendTextMessage(textInput.value));
 textInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendTextMessage(textInput.value); });
+
+// ── Features modal ─────────────────────────────────────────────────────────
+const featuresModal = document.getElementById('featuresModal');
+document.getElementById('featuresBtn').addEventListener('click', () => featuresModal.classList.add('open'));
+document.getElementById('featuresClose').addEventListener('click', () => featuresModal.classList.remove('open'));
+featuresModal.addEventListener('click', e => { if (e.target === featuresModal) featuresModal.classList.remove('open'); });
+
+// ── Splash removal ─────────────────────────────────────────────────────────
+setTimeout(() => {
+  const splash = document.getElementById('splash');
+  if (splash) splash.remove();
+}, 3900);
 
 // ── PWA: Service Worker + Install Prompt ───────────────────────────────────
 if ('serviceWorker' in navigator) {
